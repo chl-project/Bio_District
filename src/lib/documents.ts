@@ -13,11 +13,12 @@ export type DocumentRow = {
   blob_url: string;
   blob_path: string;
   status: string;
+  pesan_proses: string | null;
   created_at: string;
 };
 
 const SELECT_COLUMNS = `id, project_id, nama, disiplin, tipe, ukuran,
-                        blob_url, blob_path, status, created_at`;
+                        blob_url, blob_path, status, pesan_proses, created_at`;
 
 /**
  * Mencatat berkas yang sudah ada di Blob ke Neon.
@@ -38,7 +39,7 @@ export async function recordDocument(input: {
     async () =>
       (await getSql().query(
         `INSERT INTO documents (project_id, nama, disiplin, tipe, ukuran, blob_url, blob_path, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'diproses')
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'menunggu')
          ON CONFLICT (blob_path)
            DO UPDATE SET nama     = EXCLUDED.nama,
                          disiplin = COALESCE(EXCLUDED.disiplin, documents.disiplin),

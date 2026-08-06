@@ -40,6 +40,19 @@ export const SCHEMA_SQL = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS documents_blob_path_key ON documents (blob_path)`,
   `CREATE INDEX IF NOT EXISTS documents_project_id_idx ON documents (project_id)`,
+  `ALTER TABLE documents ADD COLUMN IF NOT EXISTS pesan_proses TEXT`,
+  `CREATE TABLE IF NOT EXISTS document_chunks (
+    id           BIGSERIAL PRIMARY KEY,
+    document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    project_id   TEXT,
+    urutan       INTEGER NOT NULL,
+    lokasi       TEXT,
+    teks         TEXT NOT NULL,
+    embedding    JSONB NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS document_chunks_document_id_idx ON document_chunks (document_id)`,
+  `CREATE INDEX IF NOT EXISTS document_chunks_project_id_idx ON document_chunks (project_id)`,
 ];
 
 export async function runMigrations() {

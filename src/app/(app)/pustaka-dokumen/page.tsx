@@ -17,8 +17,11 @@ type DocumentRow = {
   ukuran: string | null;
   blob_url: string;
   status: string;
+  pesan_proses: string | null;
   created_at: string;
 };
+
+type Rujukan = { dokumen: string; lokasi: string };
 
 const DISIPLIN = ["-", "Struktur", "Arsitektur", "MEP", "Infrastruktur"] as const;
 
@@ -34,9 +37,19 @@ const MULTIPART_MIN_BYTE = 5 * 1024 * 1024;
 const MAX_UKURAN_BYTE = 50 * 1024 * 1024;
 
 const STATUS_KIND: Record<string, StatusKind> = {
-  diproses: "success",
+  siap: "success",
   memproses: "warning",
+  menunggu: "warning",
   gagal: "danger",
+  dilewati: "neutral",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  siap: "Siap ditanya ✓",
+  memproses: "Membaca isi…",
+  menunggu: "Menunggu",
+  gagal: "Gagal dibaca",
+  dilewati: "Isi tidak dibaca",
 };
 
 export default function PustakaDokumenPage() {
@@ -51,6 +64,12 @@ export default function PustakaDokumenPage() {
   const memuat = dimuatUntuk !== proyekId;
   const [galat, setGalat] = useState<string | null>(null);
   const [muatGagal, setMuatGagal] = useState(false);
+  const [memproses, setMemproses] = useState(false);
+
+  const [pertanyaan, setPertanyaan] = useState("");
+  const [bertanya, setBertanya] = useState(false);
+  const [jawaban, setJawaban] = useState<{ teks: string; rujukan: Rujukan[] } | null>(null);
+  const [galatTanya, setGalatTanya] = useState<string | null>(null);
   const [cari, setCari] = useState("");
   const [disiplin, setDisiplin] = useState<string>(DISIPLIN[0]);
   const [progres, setProgres] = useState<{ nama: string; persen: number } | null>(null);
@@ -152,12 +171,58 @@ export default function PustakaDokumenPage() {
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
 
       await muatDaftar();
+
+      // Membaca isi berkas berjalan setelah unggahan tercatat, bukan menghalanginya:
+      // dokumen tetap tersimpan walau ekstraksinya gagal.
+      if (data.document?.id) {
+        setMemproses(true);
+        try {
+          await fetch(`/api/documents/${data.document.id}/process`, { method: "POST" });
+        } finally {
+          setMemproses(false);
+          await muatDaftar();
+        }
+      }
     } catch (error) {
       setGalat(await jelaskanKegagalan(error));
     } finally {
       // Dinaikkan lebih dulu supaya event progres yang telat diabaikan.
       unggahKe.current += 1;
       setProgres(null);
+    }
+  }
+
+  async function tanya(event: React.FormEvent) {
+    event.preventDefault();
+    if (pertanyaan.trim() === "" || bertanya) return;
+
+    setBertanya(true);
+    setGalatTanya(null);
+    setJawaban(null);
+
+    try {
+      const res = await fetch("/api/documents/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pertanyaan, projectId: proyekId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setJawaban({ teks: data.jawaban, rujukan: data.rujukan ?? [] });
+    } catch (error) {
+      setGalatTanya(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBertanya(false);
+    }
+  }
+
+  async function prosesUlang(dokumen: DocumentRow) {
+    setMemproses(true);
+    try {
+      await fetch(`/api/documents/${dokumen.id}/process`, { method: "POST" });
+    } finally {
+      setMemproses(false);
+      await muatDaftar();
     }
   }
 
@@ -200,9 +265,13 @@ export default function PustakaDokumenPage() {
           type="button"
           className="btn btn-primary"
           onClick={() => fileRef.current?.click()}
-          disabled={progres !== null}
+          disabled={progres !== null || memproses}
         >
-          {progres ? `Mengunggah… ${progres.persen}%` : "+ Upload dokumen"}
+          {progres
+            ? `Mengunggah… ${progres.persen}%`
+            : memproses
+              ? "Membaca isi…"
+              : "+ Upload dokumen"}
         </button>
 
         <select
@@ -281,10 +350,22 @@ export default function PustakaDokumenPage() {
                 <td>{doc.disiplin ?? "-"}</td>
                 <td>{formatUkuran(doc.ukuran)}</td>
                 <td>{formatTanggal(doc.created_at)}</td>
-                <td>
-                  <Badge kind={STATUS_KIND[doc.status] ?? "neutral"}>{doc.status}</Badge>
+                <td title={doc.pesan_proses ?? undefined}>
+                  <Badge kind={STATUS_KIND[doc.status] ?? "neutral"}>
+                    {STATUS_LABEL[doc.status] ?? doc.status}
+                  </Badge>
                 </td>
-                <td>
+                <td className={styles.aksi}>
+                  {doc.status === "gagal" && (
+                    <button
+                      type="button"
+                      className={`btn btn-ghost ${styles.deleteBtn}`}
+                      onClick={() => prosesUlang(doc)}
+                      disabled={memproses}
+                    >
+                      Ulangi
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`btn btn-ghost ${styles.deleteBtn}`}
@@ -315,11 +396,44 @@ export default function PustakaDokumenPage() {
 
       <div className="card elev-sm">
         <div className="card-title">Tanya Dokumen</div>
-        <p className="card-body">
-          Tanya-jawab atas isi dokumen belum tersambung — perlu ekstraksi teks PDF lebih dulu.
-          Endpoint <span className={styles.mono}>POST /api/ai/ask</span> sudah aktif untuk
-          pertanyaan umum tanpa rujukan dokumen.
+        <p className={styles.tanyaCatatan}>
+          Jawaban disusun hanya dari isi dokumen berstatus “siap ditanya” pada proyek{" "}
+          {activeProject}.
         </p>
+
+        <form onSubmit={tanya} className={styles.tanyaForm}>
+          <input
+            className={`input ${styles.tanyaInput}`}
+            placeholder="mis. Berapa mutu beton yang disyaratkan untuk kolom lantai 2?"
+            value={pertanyaan}
+            onChange={(event) => setPertanyaan(event.target.value)}
+            disabled={bertanya}
+          />
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={bertanya || pertanyaan.trim() === ""}
+          >
+            {bertanya ? "Mencari…" : "Tanya"}
+          </button>
+        </form>
+
+        {galatTanya && <div className={styles.errorDetail}>{galatTanya}</div>}
+
+        {jawaban && (
+          <div className={styles.answer}>
+            {jawaban.teks}
+            {jawaban.rujukan.length > 0 && (
+              <div className={styles.sources}>
+                {jawaban.rujukan.map((sumber, index) => (
+                  <span key={`${sumber.dokumen}-${sumber.lokasi}-${index}`} className="tag tag-neutral">
+                    {sumber.dokumen} · {sumber.lokasi}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

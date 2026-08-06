@@ -75,3 +75,37 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
+
+.aksi {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.tanyaCatatan {
+  margin: 4px 0 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.tanyaForm {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.tanyaInput {
+  flex: 1;
+}
+
+.answer {
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.sources {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
