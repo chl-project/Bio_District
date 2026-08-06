@@ -75,21 +75,25 @@ bisa dilacak ke layanan tertentu — bukan sekadar "error". Tiap pemeriksaan dib
 
 ### Membuat tabel
 
-Sekali saja, setelah `/status` menunjukkan Neon hijau. Set `SETUP_SECRET` di Vercel lalu:
+**Tidak ada langkah manual.** Saat operasi basis data pertama menemui tabel yang belum
+ada (Postgres `42P01`), skema dibuat lalu operasinya diulang sekali — termasuk seed tabel
+`projects` yang dirujuk dokumen. DDL-nya idempoten, dan hanya migrasi yang sedang berjalan
+yang dibagikan antar-permintaan sehingga cold start serentak tidak menjalankan DDL
+berbarengan.
 
-```bash
-curl -X POST https://<domain-anda>/api/setup -H "x-setup-secret: <SETUP_SECRET>"
-```
+Hasil migrasi sengaja tidak di-cache: kalau skema hilang belakangan — misalnya
+`DATABASE_URL` dialihkan ke branch Neon yang masih kosong — skema dibangun ulang, bukan
+dianggap sudah ada.
 
-DDL-nya idempoten (`CREATE TABLE IF NOT EXISTS`), aman diulang. Endpoint ini dilindungi
-header karena menjalankan DDL — tanpa `SETUP_SECRET` ia menolak dengan `503`.
+`POST /api/setup` tetap tersedia untuk menjalankannya secara eksplisit, dilindungi header
+`x-setup-secret` karena menjalankan DDL; tanpa `SETUP_SECRET` ia menolak dengan `503`.
 
 ### Endpoint
 
 | Rute | Fungsi |
 | --- | --- |
 | `GET /api/health` | Status ketiga layanan |
-| `POST /api/setup` | Membuat tabel (butuh `x-setup-secret`) |
+| `POST /api/setup` | Membuat tabel secara eksplisit (butuh `x-setup-secret`) |
 | `GET /api/documents` | Daftar dokumen, filter opsional `?projectId=` |
 | `POST /api/documents` | Mencatat berkas yang baru diunggah ke Blob |
 | `DELETE /api/documents/[id]` | Menghapus baris beserta berkasnya di Blob |

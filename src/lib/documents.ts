@@ -1,6 +1,6 @@
 import { del, head } from "@vercel/blob";
 
-import { getSql } from "./db";
+import { denganSkema, getSql } from "./db";
 import { requireEnv } from "./env";
 
 export type DocumentRow = {
@@ -33,49 +33,54 @@ export async function recordDocument(input: {
   disiplin?: string | null;
 }) {
   const meta = await head(input.pathname, { token: requireEnv("blob") });
-  const sql = getSql();
 
-  const rows = (await sql.query(
-    `INSERT INTO documents (project_id, nama, disiplin, tipe, ukuran, blob_url, blob_path, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'diproses')
-     ON CONFLICT (blob_path)
-       DO UPDATE SET nama     = EXCLUDED.nama,
-                     disiplin = COALESCE(EXCLUDED.disiplin, documents.disiplin),
-                     ukuran   = EXCLUDED.ukuran
-     RETURNING ${SELECT_COLUMNS}`,
-    [
-      input.projectId ?? null,
-      input.nama?.trim() || namaDariPath(meta.pathname),
-      input.disiplin ?? null,
-      meta.contentType ?? null,
-      meta.size,
-      meta.url,
-      meta.pathname,
-    ],
-  )) as DocumentRow[];
+  const rows = await denganSkema(
+    async () =>
+      (await getSql().query(
+        `INSERT INTO documents (project_id, nama, disiplin, tipe, ukuran, blob_url, blob_path, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'diproses')
+         ON CONFLICT (blob_path)
+           DO UPDATE SET nama     = EXCLUDED.nama,
+                         disiplin = COALESCE(EXCLUDED.disiplin, documents.disiplin),
+                         ukuran   = EXCLUDED.ukuran
+         RETURNING ${SELECT_COLUMNS}`,
+        [
+          input.projectId ?? null,
+          input.nama?.trim() || namaDariPath(meta.pathname),
+          input.disiplin ?? null,
+          meta.contentType ?? null,
+          meta.size,
+          meta.url,
+          meta.pathname,
+        ],
+      )) as DocumentRow[],
+  );
 
   return rows[0];
 }
 
 export async function listDocuments(projectId: string | null) {
-  const sql = getSql();
-  return (await sql.query(
-    `SELECT ${SELECT_COLUMNS}
-       FROM documents
-      WHERE ($1::text IS NULL OR project_id = $1)
-      ORDER BY created_at DESC
-      LIMIT 200`,
-    [projectId],
-  )) as DocumentRow[];
+  return denganSkema(
+    async () =>
+      (await getSql().query(
+        `SELECT ${SELECT_COLUMNS}
+           FROM documents
+          WHERE ($1::text IS NULL OR project_id = $1)
+          ORDER BY created_at DESC
+          LIMIT 200`,
+        [projectId],
+      )) as DocumentRow[],
+  );
 }
 
 /** Menghapus baris beserta berkasnya di Blob. Mengembalikan false bila id tidak ada. */
 export async function deleteDocument(id: string) {
-  const sql = getSql();
-  const rows = (await sql.query(
-    `DELETE FROM documents WHERE id = $1 RETURNING blob_path`,
-    [id],
-  )) as { blob_path: string }[];
+  const rows = await denganSkema(
+    async () =>
+      (await getSql().query(`DELETE FROM documents WHERE id = $1 RETURNING blob_path`, [
+        id,
+      ])) as { blob_path: string }[],
+  );
 
   if (rows.length === 0) return false;
 

@@ -50,6 +50,7 @@ export default function PustakaDokumenPage() {
   const [dimuatUntuk, setDimuatUntuk] = useState<string | null>(null);
   const memuat = dimuatUntuk !== proyekId;
   const [galat, setGalat] = useState<string | null>(null);
+  const [muatGagal, setMuatGagal] = useState(false);
   const [cari, setCari] = useState("");
   const [disiplin, setDisiplin] = useState<string>(DISIPLIN[0]);
   const [progres, setProgres] = useState<{ nama: string; persen: number } | null>(null);
@@ -73,9 +74,13 @@ export default function PustakaDokumenPage() {
       if (muatKe.current !== iniMuat) return;
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setDocuments(data.documents);
+      setMuatGagal(false);
       setGalat(null);
     } catch (error) {
       if (muatKe.current !== iniMuat) return;
+      // Tanpa penanda ini, daftar yang gagal dimuat tampil sebagai "belum ada
+      // dokumen" — kegagalan terbaca sebagai basis data kosong.
+      setMuatGagal(true);
       setGalat(error instanceof Error ? error.message : String(error));
     } finally {
       if (muatKe.current === iniMuat) setDimuatUntuk(proyekId);
@@ -296,9 +301,11 @@ export default function PustakaDokumenPage() {
                 <td colSpan={7} className={styles.empty}>
                   {memuat
                     ? "Memuat…"
-                    : documents.length === 0
-                      ? "Belum ada dokumen untuk proyek ini. Mulai dengan Upload dokumen."
-                      : "Tidak ada dokumen yang cocok dengan pencarian."}
+                    : muatGagal
+                      ? "Daftar dokumen tidak dapat dimuat — lihat pesan di atas."
+                      : documents.length === 0
+                        ? "Belum ada dokumen untuk proyek ini. Mulai dengan Upload dokumen."
+                        : "Tidak ada dokumen yang cocok dengan pencarian."}
                 </td>
               </tr>
             )}

@@ -59,3 +59,41 @@ export async function runMigrations() {
 
   return SCHEMA_SQL.length + PROJECT_IDS.length;
 }
+
+let migrasiBerjalan: Promise<number> | null = null;
+
+/**
+ * Hanya migrasi yang *sedang berjalan* yang dibagikan, sehingga permintaan
+ * bersamaan tidak menjalankan DDL berbarengan. Hasilnya sengaja tidak disimpan:
+ * menyimpan sukses membuat skema yang hilang belakangan — misalnya DATABASE_URL
+ * dialihkan ke branch Neon yang masih kosong — tidak pernah dibangun ulang.
+ */
+function pastikanSkema() {
+  migrasiBerjalan ??= runMigrations().finally(() => {
+    migrasiBerjalan = null;
+  });
+  return migrasiBerjalan;
+}
+
+/** Kode Postgres 42P01 = undefined_table. */
+function skemaBelumAda(error: unknown) {
+  if ((error as { code?: string } | null)?.code === "42P01") return true;
+  const pesan = error instanceof Error ? error.message : String(error);
+  return /relation .* does not exist/i.test(pesan);
+}
+
+/**
+ * Menjalankan operasi; bila tabelnya belum ada, skema dibuat lalu operasinya
+ * diulang sekali. Dengan begitu pembuatan tabel jadi bagian dari pemakaian
+ * pertama, bukan langkah manual terpisah yang mudah terlewat — dan aplikasi
+ * tidak terlihat rusak hanya karena basis datanya masih kosong.
+ */
+export async function denganSkema<T>(operasi: () => Promise<T>): Promise<T> {
+  try {
+    return await operasi();
+  } catch (error) {
+    if (!skemaBelumAda(error)) throw error;
+    await pastikanSkema();
+    return operasi();
+  }
+}
