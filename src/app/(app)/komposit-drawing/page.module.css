@@ -1,0 +1,107 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 1180px;
+}
+
+.tableCard {
+  padding: 0;
+  overflow: hidden;
+}
+.tableCard table {
+  margin: 0;
+}
+
+.viewerGrid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+.canvas {
+  height: 420px;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-neutral-100);
+}
+.canvasHint {
+  opacity: 0.45;
+  font-size: 13px;
+  text-align: center;
+}
+
+.layerRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+.layerRow:last-of-type {
+  border-bottom: none;
+}
+.layerTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.layerDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: none;
+}
+.layerLabel {
+  font-size: 13px;
+  flex: 1;
+}
+.layerRange {
+  width: 100%;
+}
+
+.layerActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.layerActions button {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.clashRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-divider);
+  font-size: 13px;
+}
+.clashRow:last-child {
+  border-bottom: none;
+}
+.clashLoc {
+  width: 120px;
+  flex: none;
+  opacity: 0.6;
+}
+.clashDisiplin {
+  width: 170px;
+  flex: none;
+}
+.clashJenis {
+  flex: 1;
+}
+.clashPj {
+  width: 150px;
+  flex: none;
+  opacity: 0.6;
+  text-align: right;
+}
+
+.exportBtn {
+  width: fit-content;
+}

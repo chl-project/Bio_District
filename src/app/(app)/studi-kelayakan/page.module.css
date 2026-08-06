@@ -1,0 +1,65 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1180px;
+}
+
+.dataGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+.dataLabel {
+  opacity: 0.55;
+  font-size: 11px;
+}
+
+.tabCard {
+  font-size: 13px;
+  gap: 10px;
+}
+
+.finansial {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+.sensList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+}
+.sensLabelRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.range {
+  width: 100%;
+  accent-color: var(--color-accent-2);
+}
+
+.summaryTitle {
+  color: var(--status-warning-text);
+}
+.summaryBody {
+  opacity: 1;
+  color: var(--status-warning-text);
+}
+
+.exportRow {
+  display: flex;
+  gap: 10px;
+}

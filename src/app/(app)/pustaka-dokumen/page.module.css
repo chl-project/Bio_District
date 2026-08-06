@@ -1,0 +1,44 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 1180px;
+}
+
+.actionRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.search {
+  width: 260px;
+}
+.spacer {
+  flex: 1;
+}
+
+.tableCard {
+  padding: 0;
+  overflow: hidden;
+}
+.tableCard table {
+  margin: 0;
+}
+.deleteBtn {
+  padding: 2px 6px;
+}
+
+.question {
+  margin-top: 8px;
+}
+.answer {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.sources {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

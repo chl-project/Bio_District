@@ -1,0 +1,46 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 1180px;
+}
+
+.actionRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.spacer {
+  flex: 1;
+}
+
+.tableCard {
+  padding: 0;
+  overflow: hidden;
+}
+.tableCard table {
+  margin: 0;
+}
+
+.right {
+  text-align: right;
+}
+
+.consistencyTitle {
+  color: var(--status-danger-text);
+}
+.consistencyBody {
+  font-size: 13px;
+  color: var(--status-danger-text);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compareTable {
+  margin-top: 6px;
+}
+.applyBtn {
+  width: fit-content;
+  margin-top: 6px;
+}

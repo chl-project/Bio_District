@@ -1,0 +1,72 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 1180px;
+}
+
+.subheading {
+  opacity: 0.6;
+  font-size: 13px;
+}
+
+.kpiGrid,
+.menuGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+.statusTag {
+  width: fit-content;
+}
+
+.dangerBanner {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--status-danger-bg);
+}
+.dangerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dangerCount {
+  color: var(--status-danger-text);
+  font-family: var(--font-heading), system-ui, sans-serif;
+  font-size: 20px;
+}
+.dangerText {
+  font-size: 13px;
+}
+
+.menuCard {
+  gap: 10px;
+}
+
+.bottomGrid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+}
+
+.activityRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-divider);
+  font-size: 13px;
+}
+.activityRow:last-child {
+  border-bottom: none;
+}
+.activityTime {
+  opacity: 0.5;
+}
+
+.newProjectCard {
+  justify-content: center;
+  align-items: flex-start;
+  gap: 8px;
+}
