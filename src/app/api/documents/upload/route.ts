@@ -58,9 +58,11 @@ export async function POST(request: Request) {
 
     return Response.json(hasil);
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 400 },
-    );
+    const pesan = error instanceof Error ? error.message : String(error);
+    // SDK Blob membuang body respons ini dan hanya menampilkan "Failed to
+    // retrieve the client token" ke pengguna, jadi log server adalah satu-satunya
+    // tempat alasan aslinya terbaca.
+    console.error("[api/documents/upload] gagal menerbitkan token:", pesan);
+    return Response.json({ error: pesan }, { status: 500 });
   }
 }

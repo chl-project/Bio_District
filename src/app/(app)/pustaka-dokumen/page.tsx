@@ -125,7 +125,7 @@ export default function PustakaDokumenPage() {
 
       await muatDaftar();
     } catch (error) {
-      setGalat(error instanceof Error ? error.message : String(error));
+      setGalat(await jelaskanKegagalan(error));
     } finally {
       // Dinaikkan lebih dulu supaya event progres yang telat diabaikan.
       unggahKe.current += 1;
@@ -210,12 +210,21 @@ export default function PustakaDokumenPage() {
         <div className={`card elev-sm ${styles.error}`}>
           <b>Gagal memuat atau mengunggah dokumen.</b>
           <div className={styles.errorDetail}>{galat}</div>
-          {/relation .* does not exist|does not exist/i.test(galat) && (
+          {/does not exist/i.test(galat) && (
             <div className={styles.errorDetail}>
               Tabelnya belum dibuat. Jalankan <span className={styles.mono}>POST /api/setup</span>{" "}
-              sekali — lihat halaman <a href="/status">/status</a>.
+              sekali.
             </div>
           )}
+          {/belum terbaca|client token/i.test(galat) && (
+            <div className={styles.errorDetail}>
+              Sambungkan Blob store ke proyek ini di Vercel, lalu{" "}
+              <b>Redeploy</b> — variabel lingkungan baru tidak berlaku pada deployment lama.
+            </div>
+          )}
+          <div className={styles.errorDetail}>
+            Rincian per layanan ada di <a href="/status">/status</a>.
+          </div>
         </div>
       )}
 
@@ -284,6 +293,28 @@ export default function PustakaDokumenPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * SDK Blob menelan alasan sebenarnya: apa pun penyebab gagalnya penerbitan token
+ * — variabel belum diset, token ditolak, store terhapus — pesannya sama saja,
+ * "Failed to retrieve the client token". Jadi saat itu terjadi kita tanyakan
+ * /api/health layanan mana yang sedang bermasalah dan tampilkan alasan aslinya.
+ */
+async function jelaskanKegagalan(error: unknown) {
+  const pesan = error instanceof Error ? error.message : String(error);
+  if (!/client token/i.test(pesan)) return pesan;
+
+  try {
+    const res = await fetch("/api/health");
+    const data: { checks?: { id: string; status: string; detail: string }[] } = await res.json();
+    const blob = data.checks?.find((check) => check.id === "blob");
+    if (blob && blob.status !== "ok") return `${pesan} — ${blob.detail}`;
+  } catch {
+    // Health check ikut gagal; pesan asli lebih baik daripada tidak ada.
+  }
+
+  return pesan;
 }
 
 function labelTipe(tipe: string | null) {
