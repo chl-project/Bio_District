@@ -22,9 +22,16 @@ type DocumentRow = {
 
 const DISIPLIN = ["-", "Struktur", "Arsitektur", "MEP", "Infrastruktur"] as const;
 
-const ACCEPT = ".pdf,.xlsx,.xls,.docx,.png,.jpg,.jpeg";
+// Harus sejalan dengan EKSTENSI_DIIZINKAN di /api/documents/upload. Diperiksa
+// di sini juga supaya pesannya jelas: error dari onBeforeGenerateToken ikut
+// tertelan SDK Blob dan muncul sebagai "Failed to retrieve the client token".
+const EKSTENSI_DIIZINKAN = ["pdf", "xlsx", "xls", "docx", "doc", "png", "jpg", "jpeg"];
+
+const ACCEPT = EKSTENSI_DIIZINKAN.map((item) => `.${item}`).join(",");
 
 const MULTIPART_MIN_BYTE = 5 * 1024 * 1024;
+
+const MAX_UKURAN_BYTE = 50 * 1024 * 1024;
 
 const STATUS_KIND: Record<string, StatusKind> = {
   diproses: "success",
@@ -88,6 +95,22 @@ export default function PustakaDokumenPage() {
     event.target.value = "";
     if (!file) return;
 
+    const titik = file.name.lastIndexOf(".");
+    const ekstensi = titik === -1 ? "" : file.name.slice(titik + 1).toLowerCase();
+    if (!EKSTENSI_DIIZINKAN.includes(ekstensi)) {
+      setGalat(
+        `Jenis berkas ".${ekstensi}" tidak didukung. Yang diterima: ${ACCEPT.replaceAll(",", ", ")}`,
+      );
+      return;
+    }
+    if (file.size > MAX_UKURAN_BYTE) {
+      setGalat(
+        `Berkas ${formatUkuran(String(file.size))} melebihi batas ` +
+          `${formatUkuran(String(MAX_UKURAN_BYTE))}.`,
+      );
+      return;
+    }
+
     const iniUnggahan = ++unggahKe.current;
     setGalat(null);
     setProgres({ nama: file.name, persen: 0 });
@@ -125,7 +148,7 @@ export default function PustakaDokumenPage() {
 
       await muatDaftar();
     } catch (error) {
-      setGalat(error instanceof Error ? error.message : String(error));
+      setGalat(await jelaskanKegagalan(error));
     } finally {
       // Dinaikkan lebih dulu supaya event progres yang telat diabaikan.
       unggahKe.current += 1;
@@ -210,12 +233,21 @@ export default function PustakaDokumenPage() {
         <div className={`card elev-sm ${styles.error}`}>
           <b>Gagal memuat atau mengunggah dokumen.</b>
           <div className={styles.errorDetail}>{galat}</div>
-          {/relation .* does not exist|does not exist/i.test(galat) && (
+          {/does not exist/i.test(galat) && (
             <div className={styles.errorDetail}>
               Tabelnya belum dibuat. Jalankan <span className={styles.mono}>POST /api/setup</span>{" "}
-              sekali — lihat halaman <a href="/status">/status</a>.
+              sekali.
             </div>
           )}
+          {/belum terbaca|client token/i.test(galat) && (
+            <div className={styles.errorDetail}>
+              Sambungkan Blob store ke proyek ini di Vercel, lalu{" "}
+              <b>Redeploy</b> — variabel lingkungan baru tidak berlaku pada deployment lama.
+            </div>
+          )}
+          <div className={styles.errorDetail}>
+            Rincian per layanan ada di <a href="/status">/status</a>.
+          </div>
         </div>
       )}
 
@@ -284,6 +316,28 @@ export default function PustakaDokumenPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * SDK Blob menelan alasan sebenarnya: apa pun penyebab gagalnya penerbitan token
+ * — variabel belum diset, token ditolak, store terhapus — pesannya sama saja,
+ * "Failed to retrieve the client token". Jadi saat itu terjadi kita tanyakan
+ * /api/health layanan mana yang sedang bermasalah dan tampilkan alasan aslinya.
+ */
+async function jelaskanKegagalan(error: unknown) {
+  const pesan = error instanceof Error ? error.message : String(error);
+  if (!/client token/i.test(pesan)) return pesan;
+
+  try {
+    const res = await fetch("/api/health");
+    const data: { checks?: { id: string; status: string; detail: string }[] } = await res.json();
+    const blob = data.checks?.find((check) => check.id === "blob");
+    if (blob && blob.status !== "ok") return `${pesan} — ${blob.detail}`;
+  } catch {
+    // Health check ikut gagal; pesan asli lebih baik daripada tidak ada.
+  }
+
+  return pesan;
 }
 
 function labelTipe(tipe: string | null) {
