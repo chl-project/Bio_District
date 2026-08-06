@@ -26,6 +26,9 @@ export function DatasetPanel({ dataset }: Props) {
   const [memuat, setMemuat] = useState(true);
   const [sibuk, setSibuk] = useState<string | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
+  /** Gagal sebagian: datanya tersimpan, tetapi ada langkah lanjutan yang gagal. */
+  const [peringatan, setPeringatan] = useState<string | null>(null);
+  const [kabar, setKabar] = useState<string | null>(null);
   const [analisa, setAnalisa] = useState<string | null>(null);
   const [menganalisa, setMenganalisa] = useState(false);
 
@@ -67,6 +70,8 @@ export function DatasetPanel({ dataset }: Props) {
     }
 
     setGalat(null);
+    setPeringatan(null);
+    setKabar(null);
     setSibuk("Mengunggah…");
 
     try {
@@ -94,12 +99,51 @@ export function DatasetPanel({ dataset }: Props) {
       const impor = await imporRes.json();
       if (!imporRes.ok) throw new Error(impor.error ?? `HTTP ${imporRes.status}`);
 
-      // Diindeks juga agar isinya bisa ditanya lewat Tanya Dokumen. Kegagalan di
-      // sini tidak membatalkan impor — datanya sudah tersimpan.
-      void fetch(`/api/documents/${daftar.document.id}/process`, { method: "POST" });
+      // Berkas yang terbaca tetapi kosong adalah kejadian yang paling sering
+      // membingungkan: unggahan "berhasil" tetapi tabelnya tetap kosong, dan
+      // tanpa pesan ini bentuknya sama persis dengan belum pernah mengunggah.
+      if (impor.jumlahBaris === 0) {
+        const rincian = (impor.perLembar ?? [])
+          .map((item: { lembar: string; baris: number }) => `${item.lembar}: ${item.baris}`)
+          .join(", ");
+        // Dipakai peringatan, bukan galat: `muat()` membersihkan galat saat
+        // berhasil, sehingga pesan ini akan langsung hilang lagi.
+        setPeringatan(
+          `Berkas "${file.name}" terbaca, tetapi tidak ada baris data di dalamnya (${rincian}). ` +
+            `Pastikan Anda mengisi lembar datanya — bukan lembar "Contoh Pengisian" — lalu unggah ulang.`,
+        );
+      } else {
+        setKabar(
+          `${impor.jumlahBaris} baris terimpor dari "${file.name}" ` +
+            `(${(impor.perLembar ?? [])
+              .map((item: { lembar: string; baris: number }) => `${item.lembar} ${item.baris}`)
+              .join(", ")}).`,
+        );
+      }
 
       setAnalisa(null);
       await muat();
+
+      // Pengindeksan untuk Tanya Dokumen berjalan setelah impor tersimpan, dan
+      // kegagalannya tidak membatalkan apa pun — tetapi harus tetap terlihat,
+      // bukan hanya muncul sebagai 500 senyap di konsol peramban.
+      try {
+        const prosesRes = await fetch(`/api/documents/${daftar.document.id}/process`, {
+          method: "POST",
+        });
+        if (!prosesRes.ok) {
+          const proses = await prosesRes.json().catch(() => ({}));
+          setPeringatan(
+            `Data sudah tersimpan, tetapi pengindeksan untuk Tanya Dokumen gagal: ` +
+              `${proses.error ?? `HTTP ${prosesRes.status}`}`,
+          );
+        }
+      } catch (error) {
+        setPeringatan(
+          `Data sudah tersimpan, tetapi pengindeksan untuk Tanya Dokumen gagal: ` +
+            `${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     } catch (error) {
       setGalat(await jelaskan(error));
     } finally {
@@ -191,6 +235,15 @@ export function DatasetPanel({ dataset }: Props) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {kabar && <div className={`card elev-sm ${styles.kabar}`}>{kabar}</div>}
+
+      {peringatan && (
+        <div className={`card elev-sm ${styles.peringatan}`}>
+          <b>Sebagian berhasil.</b>
+          <div className={styles.errorDetail}>{peringatan}</div>
         </div>
       )}
 

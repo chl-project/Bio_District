@@ -92,6 +92,18 @@
   word-break: break-word;
 }
 
+.kabar {
+  font-size: 13px;
+  border-color: var(--status-success-text, var(--color-divider));
+}
+
+.peringatan {
+  font-size: 13px;
+  line-height: 1.6;
+  border-color: var(--status-warning-text, var(--color-divider));
+  background: var(--status-warning-bg, transparent);
+}
+
 .analisa {
   margin-top: 10px;
   font-size: 13px;
