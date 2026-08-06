@@ -1,6 +1,4 @@
-import OpenAI from "openai";
-
-import { OPENAI_MODEL, requireEnv } from "@/lib/env";
+import { klienAi, konfigurasiAi } from "@/lib/ai-client";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +22,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const client = new OpenAI({ apiKey: requireEnv("ai") });
+    const konfigurasi = konfigurasiAi();
+    const client = klienAi(konfigurasi);
     const completion = await client.chat.completions.create({
-      model: OPENAI_MODEL,
+      model: konfigurasi.modelChat,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: pertanyaan },

@@ -14,7 +14,9 @@ const DATABASE_URL_KEYS = [
 
 const BLOB_TOKEN_KEYS = ["BLOB_READ_WRITE_TOKEN"] as const;
 
-const OPENAI_KEY_KEYS = ["OPENAI_API_KEY"] as const;
+// Penyedia disimpulkan dari bentuk kunci, bukan dari nama variabelnya, jadi
+// nama mana pun boleh dipakai — kunci Gemini di GEMINI_API_KEY tetap terbaca.
+const OPENAI_KEY_KEYS = ["OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"] as const;
 
 const APS_KEYS = ["APS_CLIENT_ID", "APS_CLIENT_SECRET"] as const;
 
@@ -62,7 +64,7 @@ export function getBlobToken(): EnvTemuan {
 }
 
 export function getOpenAiKey(): EnvTemuan {
-  return firstDefined(OPENAI_KEY_KEYS) ?? cariNama(/OPENAI_API_KEY$/);
+  return firstDefined(OPENAI_KEY_KEYS) ?? cariNama(/(OPENAI|GEMINI|GOOGLE)_API_KEY$/);
 }
 
 /** APS butuh sepasang nilai; keduanya harus ada agar dianggap terpasang. */
@@ -94,13 +96,11 @@ export function namaMirip(group: keyof typeof ENV_KEYS): string[] {
   const pola: Record<keyof typeof ENV_KEYS, RegExp> = {
     database: /POSTGRES|DATABASE|NEON/i,
     blob: /BLOB|READ_WRITE_TOKEN/i,
-    ai: /OPENAI/i,
+    ai: /OPENAI|GEMINI|GOOGLE|ANTHROPIC/i,
     cad: /APS|AUTODESK|FORGE/i,
   };
   return Object.keys(process.env).filter((key) => pola[group].test(key)).sort();
 }
-
-export const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
 /** Melempar error yang menyebut nama variabel, bukan `undefined` yang membingungkan. */
 export function requireEnv(group: keyof typeof ENV_KEYS) {

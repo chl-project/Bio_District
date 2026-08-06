@@ -1,6 +1,4 @@
-import OpenAI from "openai";
-
-import { OPENAI_MODEL, requireEnv } from "@/lib/env";
+import { klienAi, konfigurasiAi } from "@/lib/ai-client";
 import { cariRujukan } from "@/lib/indexing";
 
 export const dynamic = "force-dynamic";
@@ -48,9 +46,10 @@ export async function POST(request: Request) {
       .map((item, index) => `[${index + 1}] ${item.dokumen} — ${item.lokasi}\n${item.teks}`)
       .join("\n\n");
 
-    const client = new OpenAI({ apiKey: requireEnv("ai") });
+    const konfigurasi = konfigurasiAi();
+    const client = klienAi(konfigurasi);
     const completion = await client.chat.completions.create({
-      model: OPENAI_MODEL,
+      model: konfigurasi.modelChat,
       messages: [
         { role: "system", content: SISTEM },
         { role: "user", content: `Kutipan dokumen:\n\n${konteks}\n\nPertanyaan: ${pertanyaan}` },

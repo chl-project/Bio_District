@@ -1,30 +1,25 @@
-import OpenAI from "openai";
+import { DIMENSI, klienAi, konfigurasiAi, mendukungDimensi } from "./ai-client";
 
-import { requireEnv } from "./env";
-
-export const MODEL_EMBEDDING = "text-embedding-3-small";
-
-/**
- * Dimensi dipangkas dari 1536 ke 512. Kemiripan dihitung di JavaScript, bukan
- * pgvector, sehingga seluruh vektor satu proyek harus dimuat tiap pertanyaan —
- * memangkas dimensi menjaga biaya muat itu tetap wajar tanpa memerlukan
- * ekstensi basis data yang belum tentu tersedia.
- */
-export const DIMENSI = 512;
+export { DIMENSI };
 
 const UKURAN_BATCH = 96;
+
+export function modelEmbedding() {
+  return konfigurasiAi().modelEmbedding;
+}
 
 export async function buatEmbedding(teks: string[]): Promise<number[][]> {
   if (teks.length === 0) return [];
 
-  const client = new OpenAI({ apiKey: requireEnv("ai") });
+  const konfigurasi = konfigurasiAi();
+  const client = klienAi(konfigurasi);
   const hasil: number[][] = [];
 
   for (let i = 0; i < teks.length; i += UKURAN_BATCH) {
     const batch = teks.slice(i, i + UKURAN_BATCH);
     const res = await client.embeddings.create({
-      model: MODEL_EMBEDDING,
-      dimensions: DIMENSI,
+      model: konfigurasi.modelEmbedding,
+      ...(mendukungDimensi(konfigurasi.modelEmbedding) ? { dimensions: DIMENSI } : {}),
       input: batch,
     });
     // Urutan balasan tidak dijamin sama dengan urutan kiriman; `index` yang menentukan.
@@ -35,10 +30,23 @@ export async function buatEmbedding(teks: string[]): Promise<number[][]> {
   return hasil;
 }
 
-/** Embedding OpenAI sudah dinormalisasi, jadi hasil kali titik = kemiripan kosinus. */
+/**
+ * Kosinus dengan normalisasi eksplisit. Embedding OpenAI sudah bernorma satu,
+ * tetapi penyedia lain belum tentu — tanpa normalisasi, skornya tidak sebanding.
+ */
 export function kemiripan(a: number[], b: number[]) {
-  let total = 0;
-  const panjang = Math.min(a.length, b.length);
-  for (let i = 0; i < panjang; i++) total += a[i] * b[i];
-  return total;
+  if (a.length !== b.length) return 0;
+
+  let titik = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < a.length; i++) {
+    titik += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+
+  const pembagi = Math.sqrt(normA) * Math.sqrt(normB);
+  return pembagi === 0 ? 0 : titik / pembagi;
 }

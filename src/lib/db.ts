@@ -52,6 +52,9 @@ export const SCHEMA_SQL = [
     embedding    JSONB NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
+  // Model embedding ikut disimpan: vektor dari model berbeda punya dimensi
+  // berbeda, dan membandingkannya menghasilkan skor tanpa arti secara diam-diam.
+  `ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS model TEXT`,
   `CREATE INDEX IF NOT EXISTS document_chunks_document_id_idx ON document_chunks (document_id)`,
   `CREATE INDEX IF NOT EXISTS document_chunks_project_id_idx ON document_chunks (project_id)`,
   `CREATE TABLE IF NOT EXISTS dataset_rows (

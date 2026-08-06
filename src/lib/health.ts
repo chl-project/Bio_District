@@ -1,10 +1,10 @@
 import { list } from "@vercel/blob";
-import OpenAI from "openai";
+
+import { NAMA_PENYEDIA, klienAi, konfigurasiAi } from "./ai-client";
 
 import { getSql } from "./db";
 import {
   ENV_KEYS,
-  OPENAI_MODEL,
   getApsKredensial,
   getBlobToken,
   getDatabaseUrl,
@@ -147,32 +147,53 @@ async function checkAi(): Promise<ServiceCheck> {
   const env = getOpenAiKey();
   if (!env) return missing("ai", "OpenAI API");
 
+  const konfigurasi = konfigurasiAi();
+  const label = `AI (${NAMA_PENYEDIA[konfigurasi.penyedia]})`;
+
+  if (konfigurasi.penyedia === "lain" && !konfigurasi.alamatEksplisit) {
+    return {
+      id: "ai",
+      label,
+      status: "gagal",
+      envVar: env.key,
+      detail:
+        `Bentuk kunci pada ${env.key} tidak dikenali — kunci OpenAI diawali "sk-", ` +
+        `kunci Google diawali "AQ." atau "AIza". Set OPENAI_BASE_URL bila memakai penyedia lain.`,
+      durasiMs: 0,
+    };
+  }
+
   const { value, durasiMs, error } = await timed(async () => {
-    const client = new OpenAI({ apiKey: env.value });
-    const models = await client.models.list();
+    const models = await klienAi(konfigurasi).models.list();
     return models.data.map((model) => model.id);
   });
 
   if (error) {
     return {
       id: "ai",
-      label: "OpenAI API",
+      label,
       status: "gagal",
       envVar: env.key,
-      detail: `Kunci API ditolak: ${describe(error)}`,
+      detail: `Kunci ditolak ${NAMA_PENYEDIA[konfigurasi.penyedia]}: ${describe(error)}`,
       durasiMs,
     };
   }
 
-  const punyaModel = value?.includes(OPENAI_MODEL) ?? false;
+  // Nama model di daftar bisa berawalan "models/" pada Gemini.
+  const daftar = value ?? [];
+  const punyaModel = daftar.some(
+    (model) => model === konfigurasi.modelChat || model.endsWith(`/${konfigurasi.modelChat}`),
+  );
+
   return {
     id: "ai",
-    label: "OpenAI API",
+    label,
     status: "ok",
     envVar: env.key,
-    detail: punyaModel
-      ? `Kunci valid, model "${OPENAI_MODEL}" tersedia.`
-      : `Kunci valid, tetapi model "${OPENAI_MODEL}" tidak ada di daftar akun ini — sesuaikan OPENAI_MODEL.`,
+    detail:
+      `Kunci diterima. Model jawaban "${konfigurasi.modelChat}"` +
+      (punyaModel ? " tersedia" : " TIDAK ada di daftar akun ini — sesuaikan OPENAI_MODEL") +
+      `; model embedding "${konfigurasi.modelEmbedding}".`,
     durasiMs,
   };
 }

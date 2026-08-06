@@ -1,6 +1,6 @@
 import { denganSkema, getSql } from "./db";
 import { pecah } from "./chunks";
-import { buatEmbedding, kemiripan } from "./embeddings";
+import { buatEmbedding, kemiripan, modelEmbedding } from "./embeddings";
 import { bisaDiekstrak, ekstrakTeks } from "./extract";
 
 export type StatusProses = "menunggu" | "memproses" | "siap" | "gagal" | "dilewati";
@@ -61,11 +61,12 @@ export async function prosesDokumen(id: string) {
 
       const vektor = await buatEmbedding(serpihan.map((item) => item.teks));
 
+      const model = modelEmbedding();
       await sql.query(`DELETE FROM document_chunks WHERE document_id = $1`, [id]);
       for (let i = 0; i < serpihan.length; i++) {
         await sql.query(
-          `INSERT INTO document_chunks (document_id, project_id, urutan, lokasi, teks, embedding)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+          `INSERT INTO document_chunks (document_id, project_id, urutan, lokasi, teks, embedding, model)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             id,
             dokumen.project_id,
@@ -73,6 +74,7 @@ export async function prosesDokumen(id: string) {
             serpihan[i].lokasi,
             serpihan[i].teks,
             JSON.stringify(vektor[i]),
+            model,
           ],
         );
       }
@@ -97,13 +99,17 @@ export async function cariRujukan(
 ): Promise<Rujukan[]> {
   return denganSkema(async () => {
     const sql = getSql();
+    // Hanya serpihan dari model embedding yang sedang dipakai. Vektor lama dari
+    // model lain berdimensi berbeda; membandingkannya menghasilkan peringkat
+    // acak, dan itu jauh lebih buruk daripada tidak menemukan apa-apa.
+    const model = modelEmbedding();
     const rows = (await sql.query(
       `SELECT c.teks, c.lokasi, c.embedding, d.nama AS dokumen
          FROM document_chunks c
          JOIN documents d ON d.id = c.document_id
-        WHERE c.project_id = $1
+        WHERE c.project_id = $1 AND (c.model = $2 OR c.model IS NULL)
         LIMIT ${MAKS_MUAT}`,
-      [projectId],
+      [projectId, model],
     )) as { teks: string; lokasi: string; embedding: number[] | string; dokumen: string }[];
 
     if (rows.length === 0) return [];

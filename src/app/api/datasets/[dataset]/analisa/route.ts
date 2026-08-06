@@ -1,9 +1,7 @@
-import OpenAI from "openai";
-
 import { hitungRingkasan } from "@/lib/dataset-analisa";
 import { ambilDatasetBaris } from "@/lib/dataset-store";
 import { ambilDataset, type Dataset } from "@/lib/datasets";
-import { OPENAI_MODEL, requireEnv } from "@/lib/env";
+import { klienAi, konfigurasiAi } from "@/lib/ai-client";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -98,9 +96,10 @@ export async function POST(request: Request, ctx: RouteContext<"/api/datasets/[d
       .map((item) => `- ${item.label}: ${item.nilai}`)
       .join("\n");
 
-    const client = new OpenAI({ apiKey: requireEnv("ai") });
+    const konfigurasi = konfigurasiAi();
+    const client = klienAi(konfigurasi);
     const completion = await client.chat.completions.create({
-      model: OPENAI_MODEL,
+      model: konfigurasi.modelChat,
       messages: [
         { role: "system", content: `${SISTEM} ${FOKUS[id] ?? ""}` },
         {
