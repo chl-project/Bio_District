@@ -16,6 +16,8 @@ const BLOB_TOKEN_KEYS = ["BLOB_READ_WRITE_TOKEN"] as const;
 
 const OPENAI_KEY_KEYS = ["OPENAI_API_KEY"] as const;
 
+const APS_KEYS = ["APS_CLIENT_ID", "APS_CLIENT_SECRET"] as const;
+
 export type EnvTemuan = { key: string; value: string } | null;
 
 function firstDefined(keys: readonly string[]): EnvTemuan {
@@ -63,16 +65,25 @@ export function getOpenAiKey(): EnvTemuan {
   return firstDefined(OPENAI_KEY_KEYS) ?? cariNama(/OPENAI_API_KEY$/);
 }
 
+/** APS butuh sepasang nilai; keduanya harus ada agar dianggap terpasang. */
+export function getApsKredensial(): EnvTemuan {
+  const id = firstDefined(APS_KEYS);
+  const rahasia = firstDefined(["APS_CLIENT_SECRET"]);
+  return id && rahasia ? id : null;
+}
+
 const PENCARI = {
   database: getDatabaseUrl,
   blob: getBlobToken,
   ai: getOpenAiKey,
+  cad: getApsKredensial,
 } as const;
 
 export const ENV_KEYS = {
   database: DATABASE_URL_KEYS,
   blob: BLOB_TOKEN_KEYS,
   ai: OPENAI_KEY_KEYS,
+  cad: APS_KEYS,
 } as const;
 
 /**
@@ -84,6 +95,7 @@ export function namaMirip(group: keyof typeof ENV_KEYS): string[] {
     database: /POSTGRES|DATABASE|NEON/i,
     blob: /BLOB|READ_WRITE_TOKEN/i,
     ai: /OPENAI/i,
+    cad: /APS|AUTODESK|FORGE/i,
   };
   return Object.keys(process.env).filter((key) => pola[group].test(key)).sort();
 }

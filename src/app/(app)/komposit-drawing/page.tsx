@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Badge } from "@/components/badge";
+import { DrawingPanel } from "@/components/drawing-panel";
+import { PenandaContoh } from "@/components/penanda-contoh";
 import { CLASH_FINDINGS, COMPOSITE_FILES, DEFAULT_LAYERS } from "@/lib/sample-data";
 import styles from "./page.module.css";
 
@@ -16,6 +18,10 @@ export default function KompositDrawingPage() {
 
   return (
     <div className={styles.page}>
+      <DrawingPanel />
+
+      <PenandaContoh />
+
       <div className={`card elev-sm ${styles.tableCard}`}>
         <table className="table">
           <thead>

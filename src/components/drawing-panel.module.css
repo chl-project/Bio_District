@@ -1,0 +1,53 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.aksi {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.aksi > button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.disiplin {
+  width: 170px;
+  flex-shrink: 0;
+}
+.spacer {
+  flex: 1;
+}
+.hidden {
+  display: none;
+}
+
+.tableCard {
+  padding: 0;
+  overflow: hidden;
+}
+.tableCard table {
+  margin: 0;
+}
+.aksiBtn {
+  padding: 2px 6px;
+}
+.kosong {
+  padding: 26px 12px;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.error {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.errorDetail {
+  margin-top: 6px;
+  opacity: 0.8;
+  word-break: break-word;
+}

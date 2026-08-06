@@ -5,13 +5,14 @@ import { getSql } from "./db";
 import {
   ENV_KEYS,
   OPENAI_MODEL,
+  getApsKredensial,
   getBlobToken,
   getDatabaseUrl,
   getOpenAiKey,
   namaMirip,
 } from "./env";
 
-export type ServiceId = "database" | "blob" | "ai";
+export type ServiceId = "database" | "blob" | "ai" | "cad";
 
 export type ServiceStatus = "ok" | "belum-diset" | "gagal";
 
@@ -176,8 +177,39 @@ async function checkAi(): Promise<ServiceCheck> {
   };
 }
 
+async function checkCad(): Promise<ServiceCheck> {
+  const env = getApsKredensial();
+  if (!env) return missing("cad", "Autodesk (DWG)");
+
+  const { value, durasiMs, error } = await timed(async () => {
+    const { tokenAps, namaBucket } = await import("./aps");
+    await tokenAps();
+    return namaBucket();
+  });
+
+  if (error) {
+    return {
+      id: "cad",
+      label: "Autodesk (DWG)",
+      status: "gagal",
+      envVar: env.key,
+      detail: describe(error),
+      durasiMs,
+    };
+  }
+
+  return {
+    id: "cad",
+    label: "Autodesk (DWG)",
+    status: "ok",
+    envVar: env.key,
+    detail: `Kredensial diterima. Bucket yang dipakai: ${value}.`,
+    durasiMs,
+  };
+}
+
 export async function runHealthChecks(): Promise<ServiceCheck[]> {
-  return Promise.all([checkDatabase(), checkBlob(), checkAi()]);
+  return Promise.all([checkDatabase(), checkBlob(), checkAi(), checkCad()]);
 }
 
 export function overallStatus(checks: ServiceCheck[]): ServiceStatus {

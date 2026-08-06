@@ -41,6 +41,7 @@ export const SCHEMA_SQL = [
   `CREATE UNIQUE INDEX IF NOT EXISTS documents_blob_path_key ON documents (blob_path)`,
   `CREATE INDEX IF NOT EXISTS documents_project_id_idx ON documents (project_id)`,
   `ALTER TABLE documents ADD COLUMN IF NOT EXISTS pesan_proses TEXT`,
+  `ALTER TABLE documents ADD COLUMN IF NOT EXISTS aps_urn TEXT`,
   `CREATE TABLE IF NOT EXISTS document_chunks (
     id           BIGSERIAL PRIMARY KEY,
     document_id  BIGINT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
