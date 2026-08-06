@@ -92,6 +92,13 @@
   word-break: break-word;
 }
 
+.analisa {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
 .petunjuk {
   margin: 6px 0 0;
   font-size: 13px;

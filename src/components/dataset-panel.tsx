@@ -26,6 +26,8 @@ export function DatasetPanel({ dataset }: Props) {
   const [memuat, setMemuat] = useState(true);
   const [sibuk, setSibuk] = useState<string | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
+  const [analisa, setAnalisa] = useState<string | null>(null);
+  const [menganalisa, setMenganalisa] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const muatKe = useRef(0);
@@ -92,11 +94,36 @@ export function DatasetPanel({ dataset }: Props) {
       const impor = await imporRes.json();
       if (!imporRes.ok) throw new Error(impor.error ?? `HTTP ${imporRes.status}`);
 
+      // Diindeks juga agar isinya bisa ditanya lewat Tanya Dokumen. Kegagalan di
+      // sini tidak membatalkan impor — datanya sudah tersimpan.
+      void fetch(`/api/documents/${daftar.document.id}/process`, { method: "POST" });
+
+      setAnalisa(null);
       await muat();
     } catch (error) {
       setGalat(await jelaskan(error));
     } finally {
       setSibuk(null);
+    }
+  }
+
+  async function jalankanAnalisa() {
+    setMenganalisa(true);
+    setGalat(null);
+    setAnalisa(null);
+    try {
+      const res = await fetch(`/api/datasets/${dataset}/analisa`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ projectId: proyekId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setAnalisa(data.analisa);
+    } catch (error) {
+      setGalat(error instanceof Error ? error.message : String(error));
+    } finally {
+      setMenganalisa(false);
     }
   }
 
@@ -131,6 +158,15 @@ export function DatasetPanel({ dataset }: Props) {
         >
           {sibuk ?? "+ Upload data terisi"}
         </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={jalankanAnalisa}
+          disabled={menganalisa || baris.length === 0}
+          title={baris.length === 0 ? "Unggah data terlebih dahulu" : undefined}
+        >
+          {menganalisa ? "Menganalisa…" : "✨ Analisa dengan AI"}
+        </button>
         <div className={styles.spacer} />
         <span className="tag tag-outline">{activeProject}</span>
       </div>
@@ -155,6 +191,13 @@ export function DatasetPanel({ dataset }: Props) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {analisa && (
+        <div className="card elev-sm">
+          <div className="card-kicker">Analisa AI</div>
+          <div className={styles.analisa}>{analisa}</div>
         </div>
       )}
 
