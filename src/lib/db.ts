@@ -53,6 +53,18 @@ export const SCHEMA_SQL = [
   )`,
   `CREATE INDEX IF NOT EXISTS document_chunks_document_id_idx ON document_chunks (document_id)`,
   `CREATE INDEX IF NOT EXISTS document_chunks_project_id_idx ON document_chunks (project_id)`,
+  `CREATE TABLE IF NOT EXISTS dataset_rows (
+    id           BIGSERIAL PRIMARY KEY,
+    project_id   TEXT NOT NULL,
+    dataset      TEXT NOT NULL,
+    lembar       TEXT NOT NULL,
+    urutan       INTEGER NOT NULL,
+    data         JSONB NOT NULL,
+    document_id  BIGINT REFERENCES documents(id) ON DELETE SET NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS dataset_rows_lookup_idx
+     ON dataset_rows (project_id, dataset, lembar, urutan)`,
 ];
 
 export async function runMigrations() {

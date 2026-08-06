@@ -1,0 +1,105 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.aksi {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.aksi > .btn,
+.aksi > a,
+.aksi > button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.spacer {
+  flex: 1;
+}
+.hidden {
+  display: none;
+}
+
+.ringkasan {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+.kartu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.kartuLabel {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+.kartuNilai {
+  font-size: 20px;
+  font-weight: 600;
+}
+.baik {
+  color: var(--status-success-text);
+}
+.waspada {
+  color: var(--status-warning-text);
+}
+.buruk {
+  color: var(--status-danger-text);
+}
+
+.tab {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tab button {
+  cursor: pointer;
+  border: none;
+  font: inherit;
+}
+
+.tableCard {
+  padding: 0;
+  overflow: hidden;
+}
+.scroll {
+  overflow-x: auto;
+}
+.scroll table {
+  margin: 0;
+  min-width: 100%;
+}
+.kosong {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.error {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.errorDetail {
+  margin-top: 6px;
+  opacity: 0.8;
+  word-break: break-word;
+}
+
+.petunjuk {
+  margin: 6px 0 0;
+  font-size: 13px;
+  opacity: 0.8;
+}
+.daftar {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.8;
+}

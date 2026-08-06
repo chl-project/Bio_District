@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { DatasetPanel } from "@/components/dataset-panel";
+import { PenandaContoh } from "@/components/penanda-contoh";
 import { Segmented } from "@/components/segmented";
 import { BMW_SCENARIOS, BOQ_DIVISIONS, ITP_LIST, WAKTU_ACTIVITIES, type BmwScenarioKey } from "@/lib/sample-data";
 import styles from "./page.module.css";
@@ -14,6 +16,10 @@ export default function AnalisaBmwPage() {
 
   return (
     <div className={styles.page}>
+      <DatasetPanel dataset="analisa-bmw" />
+
+      <PenandaContoh />
+
       <Segmented
         value={tab}
         onChange={setTab}

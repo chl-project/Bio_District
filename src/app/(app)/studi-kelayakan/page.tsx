@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { DatasetPanel } from "@/components/dataset-panel";
+import { PenandaContoh } from "@/components/penanda-contoh";
 import { Segmented } from "@/components/segmented";
 import { computeIrr, computeNpv, PROJECT_INFO, SCENARIO_TABLE } from "@/lib/sample-data";
 import styles from "./page.module.css";
@@ -27,6 +29,10 @@ export default function StudiKelayakanPage() {
 
   return (
     <div className={styles.page}>
+      <DatasetPanel dataset="studi-kelayakan" />
+
+      <PenandaContoh />
+
       <div className="card elev-sm">
         <div className="card-title">Data proyek</div>
         <div className={styles.dataGrid}>

@@ -1,15 +1,15 @@
 import { Badge } from "@/components/badge";
+import { DatasetPanel } from "@/components/dataset-panel";
+import { PenandaContoh } from "@/components/penanda-contoh";
 import { MATERIAL_SPECS } from "@/lib/sample-data";
 import styles from "./page.module.css";
 
 export default function SpesifikasiMaterialPage() {
   return (
     <div className={styles.page}>
-      <div className={styles.actionRow}>
-        <button type="button" className="btn btn-secondary">Unggah RKS</button>
-        <div className={styles.spacer} />
-        <button type="button" className="btn btn-secondary">Ekspor Excel</button>
-      </div>
+      <DatasetPanel dataset="spesifikasi-material" />
+
+      <PenandaContoh />
 
       <div className={`card elev-sm ${styles.tableCard}`}>
         <table className="table">
