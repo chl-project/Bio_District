@@ -5,8 +5,8 @@ Aplikasi web internal untuk studi kelayakan proyek konstruksi & perumahan — Ci
 Implementasi **Tahap 1 (Design)** dari PRD v2.0: seluruh layar dalam bentuk rangka aplikasi
 yang bisa diklik, memakai data contoh (proyek *Bio District Cilenggang*).
 
-Enam layar tersebut masih memakai data contoh. Yang sudah tersambung ke layanan nyata
-adalah lapisan backend di `/api/*` — lihat [Integrasi](#integrasi) di bawah.
+`Pustaka Dokumen` sudah memakai data nyata (Neon + Vercel Blob); lima layar lain masih
+memakai data contoh. Lihat [Integrasi](#integrasi) di bawah.
 
 ## Menjalankan
 
@@ -91,19 +91,32 @@ header karena menjalankan DDL — tanpa `SETUP_SECRET` ia menolak dengan `503`.
 | `GET /api/health` | Status ketiga layanan |
 | `POST /api/setup` | Membuat tabel (butuh `x-setup-secret`) |
 | `GET /api/documents` | Daftar dokumen, filter opsional `?projectId=` |
-| `POST /api/documents/upload` | Menerbitkan token unggah Blob + mencatat metadata ke Neon |
+| `POST /api/documents` | Mencatat berkas yang baru diunggah ke Blob |
+| `DELETE /api/documents/[id]` | Menghapus baris beserta berkasnya di Blob |
+| `POST /api/documents/upload` | Menerbitkan token unggah Blob |
 | `POST /api/ai/ask` | Tanya-jawab, body `{ "pertanyaan": "…" }` |
 
 Unggahan memakai **client upload** (`upload()` dari `@vercel/blob/client` menunjuk ke
 `/api/documents/upload`), bukan `put()` di server, karena body Route Handler di Vercel
-dibatasi 4.5 MB sedangkan RKS dan gambar umumnya lebih besar. Batas saat ini 50 MB.
-Catatan: callback `onUploadCompleted` tidak terpanggil di `localhost` — Blob perlu URL
-publik untuk memanggilnya, jadi pencatatan ke Neon baru terlihat pada deployment.
+dibatasi 4.5 MB sedangkan RKS dan gambar umumnya lebih besar. Batas saat ini 50 MB,
+dan multipart dipakai di atas 5 MB.
+
+Pencatatan ke Neon dilakukan klien lewat `POST /api/documents` setelah unggahan selesai.
+Callback `onUploadCompleted` tetap dipasang sebagai jaring pengaman, tapi tidak bisa jadi
+jalur utama: ia tidak terpanggil di `localhost` (Blob perlu URL publik) dan datangnya
+asinkron, sehingga daftar dokumen bisa terlihat kosong padahal unggahan sukses. Keduanya
+idempoten pada `blob_path`. Ukuran, tipe, dan URL selalu diambil server lewat `head()` —
+bukan dipercaya dari peramban.
+
+## Layar yang sudah memakai data nyata
+
+`Pustaka Dokumen` sudah tersambung penuh: unggah, cari, buka, dan hapus dokumen per
+proyek. Lima layar lain masih memakai `src/lib/sample-data.ts`.
 
 ## Catatan
 
 Keluaran aplikasi bersifat indikatif untuk pengambilan keputusan awal, dan tidak menggantikan
 perhitungan struktur, dokumen perizinan, maupun tanda tangan tenaga ahli bersertifikat.
 
-Enam layar UI masih memakai data contoh dari `src/lib/sample-data.ts` — menyambungkannya
-ke endpoint di atas adalah pekerjaan berikutnya. pdf.js dan Recharts belum diterapkan.
+Tanya-jawab atas isi dokumen belum ada — perlu ekstraksi teks PDF lebih dulu (pdf.js).
+Recharts juga belum diterapkan.

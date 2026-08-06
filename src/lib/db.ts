@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
 import { requireEnv } from "./env";
+import { PROJECT_IDS } from "./projects";
 
 type SqlClient = ReturnType<typeof neon>;
 
@@ -46,5 +47,15 @@ export async function runMigrations() {
   for (const statement of SCHEMA_SQL) {
     await sql.query(statement);
   }
-  return SCHEMA_SQL.length;
+
+  // Dokumen memakai foreign key ke projects, jadi barisnya harus ada lebih dulu.
+  for (const { id, nama } of PROJECT_IDS) {
+    await sql.query(
+      `INSERT INTO projects (id, nama) VALUES ($1, $2)
+       ON CONFLICT (id) DO UPDATE SET nama = EXCLUDED.nama, updated_at = now()`,
+      [id, nama],
+    );
+  }
+
+  return SCHEMA_SQL.length + PROJECT_IDS.length;
 }

@@ -2,15 +2,10 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-export const PROJECTS = [
-  "Bio District Cilenggang",
-  "Grand Cattleya Residence",
-  "Kavling Nirwana Timur",
-] as const;
+import { MAIN_PROJECT, PROJECTS, type ProjectName } from "@/lib/projects";
 
-export type ProjectName = (typeof PROJECTS)[number];
-
-export const MAIN_PROJECT: ProjectName = "Bio District Cilenggang";
+export { MAIN_PROJECT, PROJECTS };
+export type { ProjectName };
 
 type AppContextValue = {
   dark: boolean;

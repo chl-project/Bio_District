@@ -1,6 +1,6 @@
 import { type HandleUploadBody, handleUpload } from "@vercel/blob/client";
 
-import { getSql } from "@/lib/db";
+import { recordDocument } from "@/lib/documents";
 import { requireEnv } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -35,8 +35,10 @@ export async function POST(request: Request) {
         addRandomSuffix: true,
         tokenPayload: clientPayload,
       }),
+      // Jaring pengaman untuk unggahan yang tidak lewat UI kita. Pencatatan utama
+      // dilakukan klien via POST /api/documents; keduanya idempoten pada blob_path.
       onUploadCompleted: async ({ blob, tokenPayload }) => {
-        let meta: { projectId?: string; disiplin?: string } = {};
+        let meta: { nama?: string; projectId?: string; disiplin?: string } = {};
         if (tokenPayload) {
           try {
             meta = JSON.parse(tokenPayload);
@@ -45,21 +47,12 @@ export async function POST(request: Request) {
           }
         }
 
-        const sql = getSql();
-        await sql.query(
-          `INSERT INTO documents (project_id, nama, disiplin, tipe, ukuran, blob_url, blob_path, status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'diproses')
-           ON CONFLICT (blob_path) DO NOTHING`,
-          [
-            meta.projectId ?? null,
-            blob.pathname.split("/").pop() ?? blob.pathname,
-            meta.disiplin ?? null,
-            blob.contentType ?? null,
-            null,
-            blob.url,
-            blob.pathname,
-          ],
-        );
+        await recordDocument({
+          pathname: blob.pathname,
+          nama: meta.nama ?? null,
+          projectId: meta.projectId ?? null,
+          disiplin: meta.disiplin ?? null,
+        });
       },
     });
 
