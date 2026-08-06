@@ -2,7 +2,14 @@ import { list } from "@vercel/blob";
 import OpenAI from "openai";
 
 import { getSql } from "./db";
-import { ENV_KEYS, OPENAI_MODEL, getBlobToken, getDatabaseUrl, getOpenAiKey } from "./env";
+import {
+  ENV_KEYS,
+  OPENAI_MODEL,
+  getBlobToken,
+  getDatabaseUrl,
+  getOpenAiKey,
+  namaMirip,
+} from "./env";
 
 export type ServiceId = "database" | "blob" | "ai";
 
@@ -19,12 +26,23 @@ export type ServiceCheck = {
 };
 
 function missing(id: ServiceId, label: string): ServiceCheck {
+  // Menyebut variabel mirip yang memang ada sangat mempercepat diagnosa: kalau
+  // integrasi dipasang dengan awalan khusus, namanya akan muncul di sini.
+  // Hanya nama yang ditampilkan — nilainya rahasia.
+  const mirip = namaMirip(id);
+  const petunjuk =
+    mirip.length > 0
+      ? ` Yang terdeteksi di runtime: ${mirip.join(", ")} — pastikan salah satunya berisi kredensial yang benar.`
+      : " Tidak ada variabel bernama mirip di runtime ini, jadi store-nya kemungkinan belum tersambung ke proyek.";
+
   return {
     id,
     label,
     status: "belum-diset",
     envVar: ENV_KEYS[id].join(" / "),
-    detail: `Variabel lingkungan belum terbaca di runtime ini. Set salah satu dari: ${ENV_KEYS[id].join(", ")}.`,
+    detail:
+      `Variabel lingkungan belum terbaca di runtime ini. ` +
+      `Set salah satu dari: ${ENV_KEYS[id].join(", ")}.${petunjuk}`,
     durasiMs: 0,
   };
 }
