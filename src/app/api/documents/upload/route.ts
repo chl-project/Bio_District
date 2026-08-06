@@ -5,16 +5,31 @@ import { requireEnv } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Penjagaan utama memakai ekstensi, bukan tipe konten: peramban melaporkan
+ * `application/octet-stream` untuk .xlsx/.docx bila Office tidak terpasang,
+ * sehingga berkas yang sah ikut ditolak kalau MIME yang dijadikan patokan.
+ */
+const EKSTENSI_DIIZINKAN = ["pdf", "xlsx", "xls", "docx", "doc", "png", "jpg", "jpeg"];
+
 const ALLOWED_CONTENT_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
   "image/png",
   "image/jpeg",
+  "application/octet-stream",
 ];
 
 const MAX_UKURAN_BYTE = 50 * 1024 * 1024;
+
+function ekstensiDari(pathname: string) {
+  const nama = pathname.split("/").pop() ?? pathname;
+  const titik = nama.lastIndexOf(".");
+  return titik === -1 ? "" : nama.slice(titik + 1).toLowerCase();
+}
 
 /**
  * Menerbitkan token unggah langsung ke Blob dari peramban, lalu mencatat metadata
@@ -29,12 +44,22 @@ export async function POST(request: Request) {
       body,
       request,
       token: requireEnv("blob"),
-      onBeforeGenerateToken: async (_pathname, clientPayload) => ({
-        allowedContentTypes: ALLOWED_CONTENT_TYPES,
-        maximumSizeInBytes: MAX_UKURAN_BYTE,
-        addRandomSuffix: true,
-        tokenPayload: clientPayload,
-      }),
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
+        const ekstensi = ekstensiDari(pathname);
+        if (!EKSTENSI_DIIZINKAN.includes(ekstensi)) {
+          throw new Error(
+            `Jenis berkas ".${ekstensi}" tidak didukung. Yang diterima: ` +
+              EKSTENSI_DIIZINKAN.map((item) => `.${item}`).join(", "),
+          );
+        }
+
+        return {
+          allowedContentTypes: ALLOWED_CONTENT_TYPES,
+          maximumSizeInBytes: MAX_UKURAN_BYTE,
+          addRandomSuffix: true,
+          tokenPayload: clientPayload,
+        };
+      },
       // Jaring pengaman untuk unggahan yang tidak lewat UI kita. Pencatatan utama
       // dilakukan klien via POST /api/documents; keduanya idempoten pada blob_path.
       onUploadCompleted: async ({ blob, tokenPayload }) => {

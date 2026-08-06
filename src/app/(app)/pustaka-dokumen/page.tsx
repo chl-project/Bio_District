@@ -22,9 +22,16 @@ type DocumentRow = {
 
 const DISIPLIN = ["-", "Struktur", "Arsitektur", "MEP", "Infrastruktur"] as const;
 
-const ACCEPT = ".pdf,.xlsx,.xls,.docx,.png,.jpg,.jpeg";
+// Harus sejalan dengan EKSTENSI_DIIZINKAN di /api/documents/upload. Diperiksa
+// di sini juga supaya pesannya jelas: error dari onBeforeGenerateToken ikut
+// tertelan SDK Blob dan muncul sebagai "Failed to retrieve the client token".
+const EKSTENSI_DIIZINKAN = ["pdf", "xlsx", "xls", "docx", "doc", "png", "jpg", "jpeg"];
+
+const ACCEPT = EKSTENSI_DIIZINKAN.map((item) => `.${item}`).join(",");
 
 const MULTIPART_MIN_BYTE = 5 * 1024 * 1024;
+
+const MAX_UKURAN_BYTE = 50 * 1024 * 1024;
 
 const STATUS_KIND: Record<string, StatusKind> = {
   diproses: "success",
@@ -87,6 +94,22 @@ export default function PustakaDokumenPage() {
     // Direset lebih dulu supaya memilih berkas yang sama dua kali tetap memicu onChange.
     event.target.value = "";
     if (!file) return;
+
+    const titik = file.name.lastIndexOf(".");
+    const ekstensi = titik === -1 ? "" : file.name.slice(titik + 1).toLowerCase();
+    if (!EKSTENSI_DIIZINKAN.includes(ekstensi)) {
+      setGalat(
+        `Jenis berkas ".${ekstensi}" tidak didukung. Yang diterima: ${ACCEPT.replaceAll(",", ", ")}`,
+      );
+      return;
+    }
+    if (file.size > MAX_UKURAN_BYTE) {
+      setGalat(
+        `Berkas ${formatUkuran(String(file.size))} melebihi batas ` +
+          `${formatUkuran(String(MAX_UKURAN_BYTE))}.`,
+      );
+      return;
+    }
 
     const iniUnggahan = ++unggahKe.current;
     setGalat(null);
