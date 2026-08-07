@@ -55,11 +55,17 @@ export const DATASETS: Record<string, Dataset> = {
           teks("catatan", "Catatan", 34),
         ],
         contoh: [
-          ["Luas lahan", 4.8, "ha", "Sertifikat HGB", "Termasuk sempadan sungai"],
-          ["Jumlah unit", 210, "unit", "Siteplan Rev.2", "Tipe 36/72 dan 45/90"],
-          ["Harga jual rata-rata", 1150000000, "Rp/unit", "Survei pasar Q3", ""],
-          ["Laju serapan", 7, "unit/bulan", "Survei pasar Q3", "Asumsi basis"],
-          ["Tingkat diskonto", 12, "%/tahun", "Kebijakan internal", "Untuk NPV"],
+          ["Luas lahan", 4.8, "ha", "Sertifikat HGB-1122/CLG", "Termasuk sempadan sungai sisi timur"],
+          ["Luas efektif kavling", 2.88, "ha", "Siteplan Rev.2", "60% dari luas lahan, sisanya jalan & fasum"],
+          ["Jumlah unit", 210, "unit", "Siteplan Rev.2", "84 unit tipe 36/72, 126 unit tipe 45/90"],
+          ["Harga jual rata-rata", 1_230_000_000, "Rp/unit", "Survei pasar Q3 2026", "40% tipe 36/72 @1.05 M, 60% tipe 45/90 @1.35 M"],
+          ["Laju serapan", 7, "unit/bulan", "Survei pasar Q3 2026", "Asumsi basis; rentang 6-8 unit/bulan"],
+          ["Durasi konstruksi", 25, "bulan", "Master schedule Rev.1", "Jalur kritis: tanah, struktur, serah terima"],
+          ["Biaya bangunan per unit", 380_000_000, "Rp/unit", "RAB Rev.1", "Rata-rata tertimbang tipe 36/72 dan 45/90"],
+          ["Biaya konstruksi", 115_000_000_000, "Rp", "RAB Rev.1", "210 unit x 380 jt + 35 M infrastruktur kawasan"],
+          ["Biaya lahan & perizinan", 55_000_000_000, "Rp", "Akta jual beli 2024 + estimasi izin", "Nilai perolehan 2024; harga pasar kini lebih tinggi"],
+          ["Marketing & overhead", 34_000_000_000, "Rp", "Rencana anggaran pemasaran", "~13% dari pendapatan, termasuk biaya pendanaan"],
+          ["Tingkat diskonto", 12, "%/tahun", "Kebijakan internal CHL", "Dipakai untuk perhitungan NPV"],
         ],
       },
       {
@@ -74,12 +80,16 @@ export const DATASETS: Record<string, Dataset> = {
           angka("biaya_operasional", "Biaya operasional", 20),
           angka("arus_kas_bersih", "Arus kas bersih", 20),
         ],
+        // Pendapatan total sengaja sama dengan jumlah unit dikali harga rata-rata
+        // di lembar Asumsi, dan biaya konstruksinya sama dengan asumsi RAB —
+        // angka pembuka yang tidak konsisten hanya melatih orang mengabaikannya.
         contoh: [
-          [0, 0, 45000000000, 0, ""],
-          [1, 28000000000, 35000000000, 4200000000, ""],
-          [2, 52000000000, 25000000000, 5100000000, ""],
-          [3, 61000000000, 12000000000, 5400000000, ""],
-          [4, 44000000000, 0, 3800000000, ""],
+          [0, 0, 55_000_000_000, 0, ""],
+          [1, 41_000_000_000, 35_000_000_000, 6_000_000_000, ""],
+          [2, 75_000_000_000, 42_000_000_000, 9_000_000_000, ""],
+          [3, 77_000_000_000, 28_000_000_000, 8_000_000_000, ""],
+          [4, 47_000_000_000, 10_000_000_000, 7_000_000_000, ""],
+          [5, 18_300_000_000, 0, 4_000_000_000, ""],
         ],
       },
       {
@@ -93,8 +103,10 @@ export const DATASETS: Record<string, Dataset> = {
           teks("catatan", "Catatan", 34),
         ],
         contoh: [
-          ["Tipe 36/72", "Griya Serpong Asri", 950000000, 6, "Jarak 1.2 km"],
-          ["Tipe 45/90", "Cluster Bukit Indah", 1350000000, 4, "Fasilitas lebih lengkap"],
+          ["Tipe 36/72", "Griya Serpong Asri", 950_000_000, 6, "Jarak 1.2 km, fasilitas standar"],
+          ["Tipe 36/72", "Cluster Melati Residence", 1_020_000_000, 5, "Jarak 2.4 km, sudah serah terima penuh"],
+          ["Tipe 45/90", "Cluster Bukit Indah", 1_350_000_000, 4, "Jarak 1.8 km, fasilitas lebih lengkap"],
+          ["Tipe 45/90", "Serpong Garden Estate", 1_420_000_000, 3, "Jarak 3.1 km, akses tol lebih dekat"],
         ],
       },
       {
@@ -108,9 +120,12 @@ export const DATASETS: Record<string, Dataset> = {
           teks("catatan", "Catatan", 34),
         ],
         contoh: [
-          ["Sertifikat HGB", "Terbit", "HGB-1122/CLG", "2024-03-11", ""],
-          ["PKKPR", "Proses", "-", "", "Menunggu rekomendasi teknis"],
-          ["Persetujuan Lingkungan", "Belum", "-", "", "Perlu UKL-UPL"],
+          ["Sertifikat HGB", "Terbit", "HGB-1122/CLG", "2024-03-11", "Berlaku s.d. 2043 a.n. Cipta Harmoni Lestari"],
+          ["PKKPR", "Terbit", "PKKPR-0457/TNG/2025", "2025-06-02", "Zona perumahan kepadatan sedang"],
+          ["Pengesahan siteplan", "Terbit", "SP-089/DPUPR/2025", "2025-04-22", "KDB 60%, KLB 1.2, GSB 4 m"],
+          ["Persetujuan Lingkungan (SPPL)", "Terbit", "SPPL-231/DLH/2025", "2025-08-14", ""],
+          ["PBG", "Proses", "-", "", "Menunggu rekomendasi TABG, perkiraan 2 bulan"],
+          ["Izin pelebaran akses jalan", "Proses", "-", "", "Menunggu persetujuan Dinas PU — risiko jadwal"],
         ],
       },
     ],

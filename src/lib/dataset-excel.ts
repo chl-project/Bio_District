@@ -6,9 +6,13 @@ export type LembarTerbaca = { lembar: string; baris: BarisTerbaca[] };
 const WARNA_JUDUL = "FF474238";
 
 /**
- * Contoh pengisian sengaja ditaruh di lembar terpisah, bukan di lembar data.
- * Kalau contoh ikut di lembar data, angka fiktif bisa terimpor tanpa disadari —
- * pada studi kelayakan itu berarti keputusan diambil dari angka karangan.
+ * Lembar data terisi nilai awal sehingga template langsung bisa diunggah dan
+ * dibaca tanpa diisi dulu. Nilainya konsisten satu sama lain — pendapatan cocok
+ * dengan jumlah unit dikali harga, biaya cocok dengan asumsi RAB — supaya angka
+ * yang muncul di layar masuk akal, bukan sekadar mengisi kolom.
+ *
+ * Konsekuensinya angka pembuka ini ikut terimpor bila tidak diganti. Peringatan
+ * untuk menggantinya ditaruh di lembar Petunjuk dan di baris pertama tiap lembar.
  */
 export async function buatTemplate(dataset: Dataset): Promise<ArrayBuffer> {
   const ExcelJS = (await import("exceljs")).default;
@@ -21,9 +25,13 @@ export async function buatTemplate(dataset: Dataset): Promise<ArrayBuffer> {
   petunjuk.addRow([dataset.judul]).font = { bold: true, size: 14 };
   petunjuk.addRow([dataset.keterangan]);
   petunjuk.addRow([]);
-  petunjuk.addRow(["Isi lembar sesuai nama di bawah. Jangan mengubah baris judul kolom."]).font = {
-    italic: true,
-  };
+  const ingat = petunjuk.addRow([
+    "PENTING: lembar data sudah berisi angka pembuka sebagai contoh. " +
+      "Ganti dengan data proyek Anda sebelum dipakai mengambil keputusan.",
+  ]);
+  ingat.font = { bold: true, color: { argb: "FF9A3412" } };
+  petunjuk.addRow(["Jangan mengubah baris judul kolom — baris itu yang dipakai membaca berkas."]).font =
+    { italic: true };
   petunjuk.addRow([]);
 
   for (const lembar of dataset.lembar) {
@@ -48,21 +56,16 @@ export async function buatTemplate(dataset: Dataset): Promise<ArrayBuffer> {
     sheet.getRow(1).height = 22;
     // Baris judul tetap terlihat saat menggulir isian yang panjang.
     sheet.views = [{ state: "frozen", ySplit: 1 }];
-  }
 
-  const contoh = wb.addWorksheet("Contoh Pengisian");
-  contoh.addRow(["Contoh — jangan disalin mentah, ganti dengan data proyek Anda."]).font = {
-    bold: true,
-    italic: true,
-  };
-  for (const lembar of dataset.lembar) {
-    contoh.addRow([]);
-    contoh.addRow([lembar.nama]).font = { bold: true };
-    contoh.addRow(lembar.kolom.map((kolom) => kolom.judul)).font = { bold: true };
-    for (const baris of lembar.contoh) contoh.addRow(baris as unknown[]);
+    for (const isi of lembar.contoh) {
+      const barisData = sheet.addRow(isi as unknown[]);
+      // Kolom angka diberi format ribuan agar nilai besar mudah dibaca dan
+      // tetap tersimpan sebagai angka, bukan teks.
+      lembar.kolom.forEach((kolom, index) => {
+        if (kolom.tipe === "angka") barisData.getCell(index + 1).numFmt = "#,##0.###";
+      });
+    }
   }
-  contoh.columns = [{ width: 30 }, { width: 24 }, { width: 20 }, { width: 20 }, { width: 20 },
-                    { width: 20 }, { width: 20 }, { width: 22 }];
 
   return wb.xlsx.writeBuffer();
 }

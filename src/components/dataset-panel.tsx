@@ -110,7 +110,8 @@ export function DatasetPanel({ dataset }: Props) {
         // berhasil, sehingga pesan ini akan langsung hilang lagi.
         setPeringatan(
           `Berkas "${file.name}" terbaca, tetapi tidak ada baris data di dalamnya (${rincian}). ` +
-            `Pastikan Anda mengisi lembar datanya — bukan lembar "Contoh Pengisian" — lalu unggah ulang.`,
+            `Pastikan ada baris di bawah baris judul kolom, dan baris judulnya tidak diubah. ` +
+            `Template yang diunduh dari sini sudah berisi angka pembuka.`,
         );
       } else {
         setKabar(
