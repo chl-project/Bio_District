@@ -1,6 +1,12 @@
 import type { BarisTersimpan } from "./dataset-store";
 
-export type Ringkasan = { label: string; nilai: string; nada?: "baik" | "waspada" | "buruk" };
+export type Ringkasan = {
+  label: string;
+  nilai: string;
+  nada?: "baik" | "waspada" | "buruk";
+  /** Cara angka ini diperoleh, ditampilkan di kartu ringkasan dan ikut ke berkas hasil. */
+  rumus?: string;
+};
 
 function baris(data: BarisTersimpan[], lembar: string) {
   return data.filter((item) => item.lembar === lembar).map((item) => item.data);
@@ -27,10 +33,16 @@ function arusKas(data: BarisTersimpan[]) {
   return baris(data, "Arus Kas")
     .map((row) => ({
       tahun: angka(row.tahun),
+      // Kolom hitungan diisi saat impor. Nilai cadangannya dipakai untuk baris
+      // lama yang tersimpan sebelum kolom itu ada.
       bersih:
         row.arus_kas_bersih !== null && row.arus_kas_bersih !== undefined
           ? angka(row.arus_kas_bersih)
           : angka(row.pendapatan) - angka(row.biaya_investasi) - angka(row.biaya_operasional),
+      nilaiKini:
+        typeof row.nilai_kini === "number" && Number.isFinite(row.nilai_kini)
+          ? row.nilai_kini
+          : null,
     }))
     .sort((a, b) => a.tahun - b.tahun);
 }
@@ -93,7 +105,12 @@ export function hitungRingkasan(dataset: string, data: BarisTersimpan[]): Ringka
     if (alir.length === 0) return [{ label: "Arus kas", nilai: "belum diisi" }];
 
     const nilai = alir.map((item) => item.bersih);
-    const hasilNpv = npv(nilai, diskonto);
+    // NPV dibaca dari kolom Nilai kini bila ada, supaya angka di layar sama
+    // persis dengan total kolom itu di berkas Excel.
+    const dariKolom = alir.every((item) => item.nilaiKini !== null);
+    const hasilNpv = dariKolom
+      ? alir.reduce((total, item) => total + (item.nilaiKini ?? 0), 0)
+      : npv(nilai, diskonto);
     const hasilIrr = irr(nilai);
     const hasilPayback = payback(nilai);
 
@@ -102,18 +119,25 @@ export function hitungRingkasan(dataset: string, data: BarisTersimpan[]): Ringka
         label: `NPV (diskonto ${(diskonto * 100).toFixed(1)}%)`,
         nilai: rupiah(hasilNpv),
         nada: hasilNpv > 0 ? "baik" : "buruk",
+        rumus: "Jumlah kolom Nilai kini (PV) = Σ Arus kas bersih ÷ (1 + diskonto)^Tahun",
       },
       {
         label: "IRR",
         nilai: hasilIrr === null ? "tak terdefinisi" : persen(hasilIrr),
         nada: hasilIrr === null ? undefined : hasilIrr > diskonto ? "baik" : "buruk",
+        rumus: "Tingkat diskonto yang membuat NPV arus kas bersih sama dengan nol",
       },
       {
         label: "Payback",
         nilai: hasilPayback === null ? "belum balik modal" : `${hasilPayback.toFixed(1)} tahun`,
         nada: hasilPayback === null ? "buruk" : undefined,
+        rumus: "Tahun saat kolom Arus kas kumulatif melewati nol, diinterpolasi di dalam tahun berjalan",
       },
-      { label: "Periode proyeksi", nilai: `${alir.length} tahun` },
+      {
+        label: "Periode proyeksi",
+        nilai: `${alir.length} tahun`,
+        rumus: "Jumlah baris pada lembar Arus Kas",
+      },
     ];
   }
 
@@ -138,17 +162,28 @@ export function hitungRingkasan(dataset: string, data: BarisTersimpan[]): Ringka
     const tanpaStandar = spesifikasi.filter((row) => !String(row.standar ?? "").trim()).length;
 
     return [
-      { label: "Item material", nilai: String(spesifikasi.length) },
-      { label: "Nilai spesifikasi", nilai: rupiah(total) },
+      {
+        label: "Item material",
+        nilai: String(spesifikasi.length),
+        rumus: "Jumlah baris pada lembar Spesifikasi",
+      },
+      {
+        label: "Nilai spesifikasi",
+        nilai: rupiah(total),
+        rumus: "Total kolom Nilai (Rp) = Σ (Volume × Harga satuan)",
+      },
       {
         label: "Potensi hemat dari alternatif",
         nilai: rupiah(hemat),
         nada: hemat > 0 ? "baik" : undefined,
+        rumus:
+          "Total kolom Potensi hemat (Rp) = Σ maks(0, (Harga satuan asal − Harga alternatif) × Volume)",
       },
       {
         label: "Item tanpa standar",
         nilai: String(tanpaStandar),
         nada: tanpaStandar > 0 ? "waspada" : "baik",
+        rumus: "Jumlah baris Spesifikasi yang kolom Standar / SNI-nya kosong",
       },
     ];
   }
@@ -166,22 +201,33 @@ export function hitungRingkasan(dataset: string, data: BarisTersimpan[]): Ringka
     const durasiKritis = kritis.reduce((jumlah, row) => jumlah + angka(row.durasi_hari), 0);
 
     return [
-      { label: "Total RAB", nilai: rupiah(rab) },
-      { label: "Total pagu", nilai: rupiah(pagu) },
+      {
+        label: "Total RAB",
+        nilai: rupiah(rab),
+        rumus: "Total kolom RAB (Rp) = Σ (Volume × Harga satuan)",
+      },
+      { label: "Total pagu", nilai: rupiah(pagu), rumus: "Total kolom Pagu (Rp)" },
       {
         label: "Selisih terhadap pagu",
         nilai: selisih === null ? "pagu belum diisi" : `${selisih > 0 ? "+" : ""}${persen(selisih)}`,
         nada: selisih === null ? undefined : selisih > 0.05 ? "buruk" : selisih > 0 ? "waspada" : "baik",
+        rumus: "(Total RAB − Total pagu) ÷ Total pagu",
       },
       {
         label: "Durasi jalur kritis",
         nilai: durasiKritis === 0 ? "belum ditandai" : `${durasiKritis} hari`,
+        rumus: "Total kolom Durasi kritis (hari) = Σ Durasi baris yang Kritis-nya ya",
       },
-      { label: "Aktivitas kritis", nilai: `${kritis.length} dari ${jadwal.length}` },
+      {
+        label: "Aktivitas kritis",
+        nilai: `${kritis.length} dari ${jadwal.length}`,
+        rumus: "Cacah baris Jadwal yang kolom Kritis-nya berisi ya",
+      },
       {
         label: "Item rencana mutu",
         nilai: String(mutu.length),
         nada: mutu.length === 0 ? "waspada" : undefined,
+        rumus: "Jumlah baris pada lembar Mutu",
       },
     ];
   }

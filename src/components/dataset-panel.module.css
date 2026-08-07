@@ -22,6 +22,11 @@
 .hidden {
   display: none;
 }
+/* Tautan tidak bisa memakai atribut `disabled`; klik-nya dicegah di penangan. */
+.nonaktif {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .ringkasan {
   display: grid;
@@ -42,6 +47,11 @@
 .kartuNilai {
   font-size: 20px;
   font-weight: 600;
+}
+.kartuRumus {
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.7;
 }
 .baik {
   color: var(--status-success-text);
@@ -75,6 +85,47 @@
   margin: 0;
   min-width: 100%;
 }
+/* Kolom hasil hitungan dibedakan supaya jelas mana yang berasal dari isian. */
+.kolomRumus {
+  background: var(--color-accent-100);
+  color: var(--color-accent-800);
+}
+.tandaRumus {
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.75;
+}
+td.total {
+  font-weight: 600;
+  background: var(--color-neutral-100);
+  border-top: 2px solid var(--color-divider);
+}
+
+.rumusDaftar {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+.rumusBaris {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: 8px 14px;
+  padding: 6px 0;
+  border-top: 1px solid var(--color-divider);
+}
+.rumusBaris dt {
+  font-weight: 600;
+}
+.rumusBaris dd {
+  margin: 0;
+  opacity: 0.85;
+}
+@media (max-width: 640px) {
+  .rumusBaris {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
 .kosong {
   padding: 28px 16px;
   text-align: center;

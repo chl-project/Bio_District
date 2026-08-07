@@ -77,11 +77,27 @@ async function dariSpreadsheet(buffer: ArrayBuffer): Promise<Potongan[]> {
 function selKeTeks(sel: unknown): string {
   if (sel === null || sel === undefined) return "";
   if (typeof sel === "object") {
-    const obj = sel as { text?: unknown; result?: unknown; richText?: { text: string }[] };
+    const obj = sel as {
+      text?: unknown;
+      result?: unknown;
+      formula?: unknown;
+      sharedFormula?: unknown;
+      richText?: { text: string }[];
+    };
     if (Array.isArray(obj.richText)) return obj.richText.map((bagian) => bagian.text).join("");
+    if (sel instanceof Date) return sel.toISOString().slice(0, 10);
+
+    // Sel rumus: rumusnya ikut dibawa, bukan hanya angka hasilnya. Pertanyaan
+    // yang sering muncul atas lembar monitoring justru "angka ini dari mana" —
+    // dan jawabannya ada di rumus, yang hilang kalau hanya hasilnya diambil.
+    const rumus = obj.formula ?? obj.sharedFormula;
+    if (rumus !== undefined) {
+      const hasil = obj.result !== undefined ? selKeTeks(obj.result) : "";
+      return hasil === "" ? `=${rumus}` : `${hasil} [=${rumus}]`;
+    }
+
     if (obj.text !== undefined) return String(obj.text);
     if (obj.result !== undefined) return String(obj.result);
-    if (sel instanceof Date) return sel.toISOString().slice(0, 10);
     return "";
   }
   return String(sel);

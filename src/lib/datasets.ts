@@ -1,11 +1,62 @@
 // Definisi kumpulan data yang bisa diisi lewat template Excel.
 //
-// Satu definisi dipakai untuk tiga hal sekaligus: menghasilkan template unduhan,
-// memvalidasi berkas yang diunggah, dan menampilkan tabelnya. Menaruhnya di satu
-// tempat mencegah ketiganya berbeda kolom — sumber kesalahan yang tidak kelihatan
-// sampai datanya masuk salah kolom.
+// Satu definisi dipakai untuk empat hal sekaligus: menghasilkan template unduhan,
+// memvalidasi berkas yang diunggah, menampilkan tabelnya, dan menulis kembali
+// hasil olahan sebagai berkas Excel. Menaruhnya di satu tempat mencegah keempatnya
+// berbeda kolom — sumber kesalahan yang tidak kelihatan sampai datanya masuk
+// salah kolom.
+//
+// Kolom hasil hitungan (`rumus`) ditulis dua kali dengan sengaja: sebagai rumus
+// Excel yang hidup di dalam berkas — supaya penerima bisa melihat dan menelusuri
+// perhitungannya di bilah rumus, persis seperti lembar monitoring yang dipakai
+// di lapangan — dan sebagai fungsi TypeScript yang menghasilkan angka yang sama
+// untuk tabel di layar, ringkasan, dan analisa AI. Keduanya harus tetap sepadan;
+// bila salah satu diubah, ubah pasangannya.
 
-export type TipeKolom = "teks" | "angka" | "ya-tidak";
+export type TipeKolom = "teks" | "angka" | "ya-tidak" | "persen";
+
+export type NilaiSel = string | number | boolean | null;
+export type BarisNilai = Record<string, NilaiSel>;
+
+/** Alamat sel dan rentang untuk merakit rumus Excel pada satu baris tertentu. */
+export type RefRumus = {
+  /** Nomor baris Excel yang sedang ditulis. */
+  baris: number;
+  /** Nomor baris data pertama (di bawah baris judul). */
+  awal: number;
+  /** Nomor baris data terakhir. */
+  akhir: number;
+  /** Alamat sel kolom `kunci`, mis. `E5`. Baris lain bisa disebut eksplisit. */
+  sel: (kunci: string, baris?: number) => string;
+  /** Rentang absolut satu kolom sepanjang data di lembar ini, mis. `$E$2:$E$7`. */
+  rentang: (kunci: string) => string;
+  /** Rentang absolut satu kolom di lembar lain, mis. `Asumsi!$B$2:$B$12`. */
+  rentangLembar: (lembar: string, kunci: string) => string;
+  /** Akumulasi dari baris pertama sampai baris ini, mis. `SUM($F$2:F5)`. */
+  kumulatif: (kunci: string) => string;
+};
+
+/** Data lain yang boleh dilihat sebuah rumus saat dihitung di sisi server. */
+export type KonteksHitung = {
+  /** Baris pada lembar mana pun dalam dataset yang sama. */
+  lembar: (nama: string) => BarisNilai[];
+  /** Baris sebelum baris ini pada lembar yang sedang dihitung — untuk kolom kumulatif. */
+  sebelumnya: BarisNilai[];
+};
+
+export type Rumus = {
+  /** Penjelasan singkat memakai nama kolom, ditampilkan di layar dan lembar Petunjuk. */
+  teks: string;
+  /** Rumus Excel tanpa tanda sama dengan, dirakit untuk satu baris. */
+  excel: (ref: RefRumus) => string;
+  /** Perhitungan setara di sisi server; hasilnya ikut tersimpan dan ditampilkan. */
+  hitung: (baris: BarisNilai, konteks: KonteksHitung) => number | null;
+};
+
+/** Isi sel kolom ini pada baris TOTAL di bawah data. */
+export type Total =
+  | { jenis: "jumlah" }
+  | { jenis: "rasio"; atas: string; bawah: string };
 
 export type Kolom = {
   kunci: string;
@@ -13,12 +64,18 @@ export type Kolom = {
   tipe: TipeKolom;
   wajib?: boolean;
   lebar?: number;
+  /** Format angka Excel; bila kosong dipakai bawaan menurut tipe. */
+  format?: string;
+  /** Ada isinya berarti kolom hasil hitungan — tidak diisi manual. */
+  rumus?: Rumus;
+  total?: Total;
 };
 
 export type Lembar = {
   nama: string;
   keterangan: string;
   kolom: Kolom[];
+  /** Nilai pembuka, sejajar dengan kolom isian saja (kolom rumus tidak ikut). */
   contoh: (string | number)[][];
 };
 
@@ -35,6 +92,37 @@ const teks = (kunci: string, judul: string, lebar = 22, wajib = false): Kolom =>
 const angka = (kunci: string, judul: string, lebar = 16, wajib = false): Kolom => ({
   kunci, judul, tipe: "angka", lebar, wajib,
 });
+/** Kolom angka yang ikut dijumlahkan di baris TOTAL. */
+const jumlah = (kunci: string, judul: string, lebar = 16): Kolom => ({
+  ...angka(kunci, judul, lebar),
+  total: { jenis: "jumlah" },
+});
+/** Kolom hasil hitungan. */
+const hasil = (
+  kunci: string,
+  judul: string,
+  rumus: Rumus,
+  opsi: Partial<Kolom> = {},
+): Kolom => ({ kunci, judul, tipe: "angka", lebar: 20, ...opsi, rumus });
+
+const nol = (nilai: NilaiSel) =>
+  typeof nilai === "number" && Number.isFinite(nilai) ? nilai : 0;
+
+/** Nilai satu parameter di lembar Asumsi, dicocokkan dengan pencocokan longgar. */
+function asumsi(konteks: KonteksHitung, kata: string) {
+  return konteks
+    .lembar("Asumsi")
+    .filter((row) => String(row.parameter ?? "").toLowerCase().includes(kata))
+    .reduce((total, row) => total + nol(row.nilai), 0);
+}
+
+/** Padanan Excel dari `asumsi()`: SUMIF dengan wildcard atas kolom Parameter. */
+const asumsiExcel = (ref: RefRumus, kata: string) =>
+  `SUMIF(${ref.rentangLembar("Asumsi", "parameter")},"*${kata}*",` +
+  `${ref.rentangLembar("Asumsi", "nilai")})`;
+
+/** Diskonto 12% dipakai bila lembar Asumsi tidak memuat barisnya sama sekali. */
+const DISKONTO_BAWAAN = 0.12;
 
 export const DATASETS: Record<string, Dataset> = {
   "studi-kelayakan": {
@@ -71,25 +159,78 @@ export const DATASETS: Record<string, Dataset> = {
       {
         nama: "Arus Kas",
         keterangan:
-          "Satu baris per tahun. Arus kas bersih dihitung otomatis " +
-          "(pendapatan dikurangi investasi dan biaya operasional) bila dikosongkan.",
+          "Satu baris per tahun. Isi tiga kolom biaya dan pendapatannya saja — " +
+          "arus kas bersih, kumulatif, faktor diskonto, dan nilai kini terisi rumus.",
         kolom: [
           angka("tahun", "Tahun", 10, true),
-          angka("pendapatan", "Pendapatan", 20),
-          angka("biaya_investasi", "Biaya investasi", 20),
-          angka("biaya_operasional", "Biaya operasional", 20),
-          angka("arus_kas_bersih", "Arus kas bersih", 20),
+          jumlah("pendapatan", "Pendapatan", 20),
+          jumlah("biaya_investasi", "Biaya investasi", 20),
+          jumlah("biaya_operasional", "Biaya operasional", 20),
+          hasil(
+            "arus_kas_bersih",
+            "Arus kas bersih",
+            {
+              teks: "Pendapatan − Biaya investasi − Biaya operasional",
+              excel: (ref) =>
+                `${ref.sel("pendapatan")}-${ref.sel("biaya_investasi")}` +
+                `-${ref.sel("biaya_operasional")}`,
+              hitung: (baris) =>
+                nol(baris.pendapatan) - nol(baris.biaya_investasi) - nol(baris.biaya_operasional),
+            },
+            { lebar: 20, total: { jenis: "jumlah" } },
+          ),
+          hasil(
+            "arus_kas_kumulatif",
+            "Arus kas kumulatif",
+            {
+              teks: "Jumlah arus kas bersih dari tahun pertama sampai baris ini",
+              excel: (ref) => ref.kumulatif("arus_kas_bersih"),
+              hitung: (baris, konteks) =>
+                konteks.sebelumnya.reduce((total, row) => total + nol(row.arus_kas_bersih), 0) +
+                nol(baris.arus_kas_bersih),
+            },
+            { lebar: 22 },
+          ),
+          hasil(
+            "faktor_diskonto",
+            "Faktor diskonto",
+            {
+              teks:
+                "1 ÷ (1 + tingkat diskonto)^Tahun — tingkat diskonto diambil dari " +
+                "lembar Asumsi, 12% bila barisnya tidak ada",
+              excel: (ref) => {
+                const tarif = asumsiExcel(ref, "diskonto");
+                return `1/(1+IF(${tarif}=0,${DISKONTO_BAWAAN},${tarif}/100))^${ref.sel("tahun")}`;
+              },
+              hitung: (baris, konteks) => {
+                const tarif = asumsi(konteks, "diskonto");
+                const diskonto = tarif === 0 ? DISKONTO_BAWAAN : tarif / 100;
+                return 1 / (1 + diskonto) ** nol(baris.tahun);
+              },
+            },
+            { lebar: 16, format: "0.0000" },
+          ),
+          hasil(
+            "nilai_kini",
+            "Nilai kini (PV)",
+            {
+              teks: "Arus kas bersih × Faktor diskonto — jumlah kolom ini adalah NPV",
+              excel: (ref) => `${ref.sel("arus_kas_bersih")}*${ref.sel("faktor_diskonto")}`,
+              hitung: (baris) => nol(baris.arus_kas_bersih) * nol(baris.faktor_diskonto),
+            },
+            { lebar: 22, total: { jenis: "jumlah" } },
+          ),
         ],
         // Pendapatan total sengaja sama dengan jumlah unit dikali harga rata-rata
         // di lembar Asumsi, dan biaya konstruksinya sama dengan asumsi RAB —
         // angka pembuka yang tidak konsisten hanya melatih orang mengabaikannya.
         contoh: [
-          [0, 0, 55_000_000_000, 0, ""],
-          [1, 41_000_000_000, 35_000_000_000, 6_000_000_000, ""],
-          [2, 75_000_000_000, 42_000_000_000, 9_000_000_000, ""],
-          [3, 77_000_000_000, 28_000_000_000, 8_000_000_000, ""],
-          [4, 47_000_000_000, 10_000_000_000, 7_000_000_000, ""],
-          [5, 18_300_000_000, 0, 4_000_000_000, ""],
+          [0, 0, 55_000_000_000, 0],
+          [1, 41_000_000_000, 35_000_000_000, 6_000_000_000],
+          [2, 75_000_000_000, 42_000_000_000, 9_000_000_000],
+          [3, 77_000_000_000, 28_000_000_000, 8_000_000_000],
+          [4, 47_000_000_000, 10_000_000_000, 7_000_000_000],
+          [5, 18_300_000_000, 0, 4_000_000_000],
         ],
       },
       {
@@ -100,6 +241,23 @@ export const DATASETS: Record<string, Dataset> = {
           teks("pesaing", "Proyek pembanding", 28),
           angka("harga", "Harga (Rp/unit)", 22),
           angka("serapan", "Serapan (unit/bln)", 20),
+          hasil(
+            "selisih_harga",
+            "Selisih thd harga rencana",
+            {
+              teks:
+                "(Harga pembanding − Harga jual rata-rata di Asumsi) ÷ Harga jual rata-rata",
+              excel: (ref) => {
+                const rencana = asumsiExcel(ref, "harga jual");
+                return `IF(${rencana}=0,"",(${ref.sel("harga")}-${rencana})/${rencana})`;
+              },
+              hitung: (baris, konteks) => {
+                const rencana = asumsi(konteks, "harga jual");
+                return rencana === 0 ? null : (nol(baris.harga) - rencana) / rencana;
+              },
+            },
+            { lebar: 24, tipe: "persen" },
+          ),
           teks("catatan", "Catatan", 34),
         ],
         contoh: [
@@ -150,6 +308,16 @@ export const DATASETS: Record<string, Dataset> = {
           teks("satuan", "Satuan", 10),
           angka("volume", "Volume", 14),
           angka("harga_satuan", "Harga satuan (Rp)", 20),
+          hasil(
+            "nilai",
+            "Nilai (Rp)",
+            {
+              teks: "Volume × Harga satuan",
+              excel: (ref) => `${ref.sel("volume")}*${ref.sel("harga_satuan")}`,
+              hitung: (baris) => nol(baris.volume) * nol(baris.harga_satuan),
+            },
+            { lebar: 22, total: { jenis: "jumlah" } },
+          ),
         ],
         contoh: [
           ["STR-01", "Kolom beton bertulang", "Beton", "Site mix", "K-300 / SNI 2847", "m3", 412, 1850000],
@@ -161,12 +329,66 @@ export const DATASETS: Record<string, Dataset> = {
         nama: "Alternatif",
         keterangan:
           "Pilihan pengganti untuk item di lembar Spesifikasi. " +
-          "Kode harus sama persis agar bisa dipasangkan.",
+          "Kode harus sama persis agar bisa dipasangkan — harga asal, selisih, " +
+          "dan potensi hemat diambil dari lembar Spesifikasi lewat rumus.",
         kolom: [
           teks("kode", "Kode", 12, true),
           teks("merek", "Merek alternatif", 22, true),
           teks("standar", "Standar / SNI", 24),
           angka("harga_satuan", "Harga satuan (Rp)", 20),
+          hasil(
+            "harga_asal",
+            "Harga satuan asal (Rp)",
+            {
+              teks: "Harga satuan di lembar Spesifikasi untuk Kode yang sama",
+              excel: (ref) =>
+                `SUMIF(${ref.rentangLembar("Spesifikasi", "kode")},${ref.sel("kode")},` +
+                `${ref.rentangLembar("Spesifikasi", "harga_satuan")})`,
+              hitung: (baris, konteks) =>
+                konteks
+                  .lembar("Spesifikasi")
+                  .filter((row) => row.kode === baris.kode)
+                  .reduce((total, row) => total + nol(row.harga_satuan), 0),
+            },
+            { lebar: 22 },
+          ),
+          hasil(
+            "selisih_satuan",
+            "Selisih harga satuan (Rp)",
+            {
+              teks: "Harga satuan asal − Harga satuan alternatif",
+              excel: (ref) =>
+                `IF(${ref.sel("harga_asal")}=0,"",` +
+                `${ref.sel("harga_asal")}-${ref.sel("harga_satuan")})`,
+              hitung: (baris) =>
+                nol(baris.harga_asal) === 0
+                  ? null
+                  : nol(baris.harga_asal) - nol(baris.harga_satuan),
+            },
+            { lebar: 24 },
+          ),
+          hasil(
+            "potensi_hemat",
+            "Potensi hemat (Rp)",
+            {
+              teks:
+                "Selisih harga satuan × Volume item asal, dibatasi minimal nol — " +
+                "alternatif yang lebih mahal tidak dihitung sebagai penghematan",
+              excel: (ref) =>
+                `IF(${ref.sel("harga_asal")}=0,"",MAX(0,${ref.sel("selisih_satuan")}*` +
+                `SUMIF(${ref.rentangLembar("Spesifikasi", "kode")},${ref.sel("kode")},` +
+                `${ref.rentangLembar("Spesifikasi", "volume")})))`,
+              hitung: (baris, konteks) => {
+                if (nol(baris.harga_asal) === 0) return null;
+                const volume = konteks
+                  .lembar("Spesifikasi")
+                  .filter((row) => row.kode === baris.kode)
+                  .reduce((total, row) => total + nol(row.volume), 0);
+                return Math.max(0, nol(baris.selisih_satuan) * volume);
+              },
+            },
+            { lebar: 22, total: { jenis: "jumlah" } },
+          ),
           teks("konsekuensi", "Konsekuensi mutu", 38),
         ],
         contoh: [
@@ -186,7 +408,9 @@ export const DATASETS: Record<string, Dataset> = {
     lembar: [
       {
         nama: "BOQ",
-        keterangan: "Satu baris per item pekerjaan. RAB = volume x harga satuan.",
+        keterangan:
+          "Satu baris per item pekerjaan. RAB, selisih terhadap pagu, dan " +
+          "persentasenya terisi rumus — cukup isi volume, harga satuan, dan pagu.",
         kolom: [
           teks("divisi", "Divisi", 20, true),
           teks("kode", "Kode", 12),
@@ -194,7 +418,43 @@ export const DATASETS: Record<string, Dataset> = {
           teks("satuan", "Satuan", 10),
           angka("volume", "Volume", 14),
           angka("harga_satuan", "Harga satuan (Rp)", 20),
-          angka("pagu", "Pagu (Rp)", 20),
+          hasil(
+            "rab",
+            "RAB (Rp)",
+            {
+              teks: "Volume × Harga satuan",
+              excel: (ref) => `${ref.sel("volume")}*${ref.sel("harga_satuan")}`,
+              hitung: (baris) => nol(baris.volume) * nol(baris.harga_satuan),
+            },
+            { lebar: 22, total: { jenis: "jumlah" } },
+          ),
+          jumlah("pagu", "Pagu (Rp)", 20),
+          hasil(
+            "selisih_pagu",
+            "Selisih thd pagu (Rp)",
+            {
+              teks: "RAB − Pagu — positif berarti melebihi pagu",
+              excel: (ref) => `${ref.sel("rab")}-${ref.sel("pagu")}`,
+              hitung: (baris) => nol(baris.rab) - nol(baris.pagu),
+            },
+            { lebar: 22, total: { jenis: "jumlah" } },
+          ),
+          hasil(
+            "selisih_persen",
+            "Selisih thd pagu (%)",
+            {
+              teks: "Selisih thd pagu ÷ Pagu",
+              excel: (ref) =>
+                `IF(${ref.sel("pagu")}=0,"",${ref.sel("selisih_pagu")}/${ref.sel("pagu")})`,
+              hitung: (baris) =>
+                nol(baris.pagu) === 0 ? null : nol(baris.selisih_pagu) / nol(baris.pagu),
+            },
+            {
+              lebar: 20,
+              tipe: "persen",
+              total: { jenis: "rasio", atas: "selisih_pagu", bawah: "pagu" },
+            },
+          ),
         ],
         // Pagu diisi per item, sejajar dengan RAB = volume x harga satuan.
         // Mengisinya dengan total divisi membuat selisihnya tampak ekstrem palsu.
@@ -224,13 +484,34 @@ export const DATASETS: Record<string, Dataset> = {
         nama: "Jadwal",
         keterangan:
           "Satu baris per aktivitas. Isi kolom Kritis dengan ya atau tidak; " +
-          "total durasi jalur kritis dihitung dari baris yang bernilai ya.",
+          "durasi jalur kritis dijumlahkan lewat rumus dari baris yang bernilai ya.",
         kolom: [
           teks("aktivitas", "Aktivitas", 34, true),
-          angka("durasi_hari", "Durasi (hari)", 16),
+          jumlah("durasi_hari", "Durasi (hari)", 16),
           angka("mulai_minggu", "Mulai (minggu ke-)", 20),
           angka("selesai_minggu", "Selesai (minggu ke-)", 20),
           { kunci: "kritis", judul: "Kritis (ya/tidak)", tipe: "ya-tidak", lebar: 18 },
+          hasil(
+            "rentang_minggu",
+            "Rentang (minggu)",
+            {
+              teks: "Selesai (minggu ke-) − Mulai (minggu ke-)",
+              excel: (ref) => `${ref.sel("selesai_minggu")}-${ref.sel("mulai_minggu")}`,
+              hitung: (baris) => nol(baris.selesai_minggu) - nol(baris.mulai_minggu),
+            },
+            { lebar: 18 },
+          ),
+          hasil(
+            "durasi_kritis",
+            "Durasi kritis (hari)",
+            {
+              teks: "Durasi (hari) bila kolom Kritis berisi ya, selain itu nol",
+              excel: (ref) =>
+                `IF(LOWER(${ref.sel("kritis")})="ya",${ref.sel("durasi_hari")},0)`,
+              hitung: (baris) => (baris.kritis === true ? nol(baris.durasi_hari) : 0),
+            },
+            { lebar: 20, total: { jenis: "jumlah" } },
+          ),
         ],
         contoh: [
           ["Pekerjaan tanah & pondasi", 45, 1, 7, "ya"],
@@ -244,10 +525,24 @@ export const DATASETS: Record<string, Dataset> = {
   },
 };
 
+/** Kolom yang diisi manual — urutannya sejajar dengan `Lembar.contoh`. */
+export function kolomIsian(lembar: Lembar) {
+  return lembar.kolom.filter((kolom) => !kolom.rumus);
+}
+
+/** Kolom hasil hitungan, beserta rumusnya. */
+export function kolomRumus(lembar: Lembar) {
+  return lembar.kolom.filter((kolom) => kolom.rumus);
+}
+
 export function ambilDataset(id: string): Dataset | null {
   return DATASETS[id] ?? null;
 }
 
 export function namaBerkasTemplate(dataset: Dataset) {
   return `Template ${dataset.judul}.xlsx`;
+}
+
+export function namaBerkasHasil(dataset: Dataset) {
+  return `Hasil Olahan ${dataset.judul}.xlsx`;
 }

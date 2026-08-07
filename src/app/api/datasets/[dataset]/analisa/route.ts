@@ -1,6 +1,6 @@
 import { hitungRingkasan } from "@/lib/dataset-analisa";
 import { ambilDatasetBaris } from "@/lib/dataset-store";
-import { ambilDataset, type Dataset } from "@/lib/datasets";
+import { ambilDataset, kolomRumus, type Dataset } from "@/lib/datasets";
 import { klienAi, konfigurasiAi } from "@/lib/ai-client";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +54,9 @@ function susunTabel(definisi: Dataset, baris: { lembar: string; data: Record<str
           const nilai = item.data[kolom.kunci];
           if (nilai === null || nilai === undefined || nilai === "") return "-";
           if (kolom.tipe === "ya-tidak") return nilai === true ? "ya" : "tidak";
+          if (kolom.tipe === "persen" && typeof nilai === "number") {
+            return `${(nilai * 100).toFixed(1)}%`;
+          }
           return String(nilai);
         })
         .join(" | "),
@@ -63,6 +66,23 @@ function susunTabel(definisi: Dataset, baris: { lembar: string; data: Record<str
       isi.length > dipakai.length ? `\n(${isi.length - dipakai.length} baris lain tidak ditampilkan)` : "";
     bagian.push(`## ${lembar.nama}\n${judul}\n${isiBaris.join("\n")}${catatan}`);
   }
+
+  return bagian.join("\n\n");
+}
+
+/**
+ * Daftar rumus kolom hitungan. Tanpa ini model menebak asal-usul kolom seperti
+ * "Selisih thd pagu" dan bisa menjelaskannya keliru dalam analisanya.
+ */
+function susunRumus(definisi: Dataset) {
+  const bagian = definisi.lembar
+    .filter((lembar) => kolomRumus(lembar).length > 0)
+    .map((lembar) =>
+      [
+        `## ${lembar.nama}`,
+        ...kolomRumus(lembar).map((kolom) => `- ${kolom.judul} = ${kolom.rumus?.teks}`),
+      ].join("\n"),
+    );
 
   return bagian.join("\n\n");
 }
@@ -93,8 +113,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/datasets/[d
 
     const ringkasan = hitungRingkasan(id, baris);
     const angkaTerhitung = ringkasan
-      .map((item) => `- ${item.label}: ${item.nilai}`)
+      .map((item) => `- ${item.label}: ${item.nilai}${item.rumus ? ` (${item.rumus})` : ""}`)
       .join("\n");
+    const rumus = susunRumus(definisi);
 
     const konfigurasi = konfigurasiAi();
     const client = klienAi(konfigurasi);
@@ -107,6 +128,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/datasets/[d
           content:
             `Dataset: ${definisi.judul}\n\n` +
             `Angka yang sudah dihitung sistem:\n${angkaTerhitung}\n\n` +
+            (rumus ? `Rumus kolom hitungan:\n\n${rumus}\n\n` : "") +
             `Data terunggah:\n\n${susunTabel(definisi, baris)}`,
         },
       ],

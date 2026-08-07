@@ -99,6 +99,11 @@ dianggap sudah ada.
 | `DELETE /api/documents/[id]` | Menghapus baris beserta berkasnya di Blob |
 | `POST /api/documents/upload` | Menerbitkan token unggah Blob |
 | `POST /api/ai/ask` | Tanya-jawab, body `{ "pertanyaan": "…" }` |
+| `GET /api/datasets/[dataset]/template` | Template Excel kosong beserta petunjuk & rumusnya |
+| `GET /api/datasets/[dataset]` | Data tersimpan satu proyek, `?projectId=` |
+| `POST /api/datasets/[dataset]` | Membaca berkas terunggah menjadi baris data |
+| `GET /api/datasets/[dataset]/hasil` | Hasil olahan sebagai Excel berumus, `?projectId=` |
+| `POST /api/datasets/[dataset]/analisa` | Analisa AI atas data tersimpan |
 
 Unggahan memakai **client upload** (`upload()` dari `@vercel/blob/client` menunjuk ke
 `/api/documents/upload`), bukan `put()` di server, karena body Route Handler di Vercel
@@ -111,6 +116,34 @@ jalur utama: ia tidak terpanggil di `localhost` (Blob perlu URL publik) dan data
 asinkron, sehingga daftar dokumen bisa terlihat kosong padahal unggahan sukses. Keduanya
 idempoten pada `blob_path`. Ukuran, tipe, dan URL selalu diambil server lewat `head()` —
 bukan dipercaya dari peramban.
+
+## Pengolahan data Excel
+
+Definisi kolom tiap dataset ada di `src/lib/datasets.ts`. Selain kolom isian, tiap
+lembar punya **kolom hitungan** — RAB, selisih terhadap pagu beserta persentasenya,
+nilai kini, potensi hemat, durasi jalur kritis — yang dipakai ulang di empat tempat:
+
+| Keluaran | Bentuk rumusnya |
+| --- | --- |
+| Template unduhan | Rumus Excel hidup di sel, penjelasannya di komentar judul kolom & lembar Petunjuk |
+| Tabel di layar | Kolom bertanda ƒ, plus daftar rumus di bawah tabel dan baris TOTAL |
+| Hasil olahan (`/hasil`) | Rumus Excel hidup + baris TOTAL + lembar Ringkasan berisi asal tiap angka |
+| Analisa AI | Daftar rumus ikut dikirim supaya modelnya tidak menebak asal-usul kolom |
+
+Tiap kolom hitungan ditulis dua kali dan sengaja: sebagai rumus Excel (`excel`) dan
+sebagai fungsi TypeScript (`hitung`) yang menghasilkan angka yang sama. Yang pertama
+membuat perhitungan bisa ditelusuri di bilah rumus dan ikut berubah saat isian diubah;
+yang kedua mengisi tabel, ringkasan, dan analisa tanpa perlu membuka Excel. **Bila
+salah satu diubah, ubah pasangannya.**
+
+Nilai kolom hitungan pada berkas yang diunggah sengaja diabaikan lalu dihitung ulang —
+berkas bisa datang dari Excel yang belum menyegarkan rumusnya, atau dari salinan yang
+angkanya sudah ditempel sebagai nilai mati. Baris `TOTAL` juga dilewati saat impor
+supaya nilainya tidak terhitung dua kali.
+
+Berkas apa pun yang diunggah ke Pustaka Dokumen dibaca dengan rumusnya ikut terbawa
+(`hasil [=G195-SUM(J195:J197)]`), sehingga pertanyaan "angka ini dari mana" bisa
+dijawab dari isi lembar aslinya, bukan hanya dari angka hasilnya.
 
 ## Layar yang sudah memakai data nyata
 

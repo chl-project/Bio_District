@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAppContext } from "@/context/app-context";
 import { hitungRingkasan } from "@/lib/dataset-analisa";
-import { DATASETS } from "@/lib/datasets";
+import { DATASETS, kolomRumus, type Lembar } from "@/lib/datasets";
 import type { BarisTersimpan } from "@/lib/dataset-store";
 import { projectId } from "@/lib/projects";
 import styles from "./dataset-panel.module.css";
@@ -177,6 +177,9 @@ export function DatasetPanel({ dataset }: Props) {
   const lembar = lembarAktif ?? definisi?.lembar[0]?.nama ?? null;
   const definisiLembar = definisi?.lembar.find((item) => item.nama === lembar);
   const barisLembar = baris.filter((item) => item.lembar === lembar);
+  const rumusLembar = definisiLembar ? kolomRumus(definisiLembar) : [];
+  // Baris TOTAL yang sama dengan yang ditulis ke berkas Excel.
+  const totalLembar = hitungTotal(definisiLembar, barisLembar);
 
   return (
     <div className={styles.panel}>
@@ -203,6 +206,22 @@ export function DatasetPanel({ dataset }: Props) {
         >
           {sibuk ?? "+ Upload data terisi"}
         </button>
+        <a
+          className={`btn btn-secondary ${baris.length === 0 ? styles.nonaktif : ""}`}
+          href={`/api/datasets/${dataset}/hasil?projectId=${encodeURIComponent(proyekId)}`}
+          download
+          aria-disabled={baris.length === 0}
+          onClick={(event) => {
+            if (baris.length === 0) event.preventDefault();
+          }}
+          title={
+            baris.length === 0
+              ? "Unggah data terlebih dahulu"
+              : "Excel berisi rumus hidup, kolom hitungan, dan baris TOTAL"
+          }
+        >
+          ↓ Unduh hasil olahan (rumus)
+        </a>
         <button
           type="button"
           className="btn btn-secondary"
@@ -234,6 +253,8 @@ export function DatasetPanel({ dataset }: Props) {
               <div className={`${styles.kartuNilai} ${item.nada ? styles[item.nada] : ""}`}>
                 {item.nilai}
               </div>
+              {/* Angka tanpa asal-usulnya sulit dipercaya saat dipakai rapat. */}
+              {item.rumus && <div className={styles.kartuRumus}>{item.rumus}</div>}
             </div>
           ))}
         </div>
@@ -280,7 +301,14 @@ export function DatasetPanel({ dataset }: Props) {
               <thead>
                 <tr>
                   {definisiLembar.kolom.map((kolom) => (
-                    <th key={kolom.kunci}>{kolom.judul}</th>
+                    <th
+                      key={kolom.kunci}
+                      className={kolom.rumus ? styles.kolomRumus : undefined}
+                      title={kolom.rumus?.teks}
+                    >
+                      {kolom.judul}
+                      {kolom.rumus && <span className={styles.tandaRumus}>ƒ</span>}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -288,11 +316,31 @@ export function DatasetPanel({ dataset }: Props) {
                 {barisLembar.map((row) => (
                   <tr key={`${row.lembar}-${row.urutan}`}>
                     {definisiLembar.kolom.map((kolom) => (
-                      <td key={kolom.kunci}>{formatSel(row.data[kolom.kunci], kolom.tipe)}</td>
+                      <td
+                        key={kolom.kunci}
+                        className={kolom.rumus ? styles.kolomRumus : undefined}
+                      >
+                        {formatSel(row.data[kolom.kunci], kolom.tipe)}
+                      </td>
                     ))}
                   </tr>
                 ))}
               </tbody>
+              {totalLembar && (
+                <tfoot>
+                  <tr>
+                    {definisiLembar.kolom.map((kolom, indeks) => (
+                      <td key={kolom.kunci} className={styles.total}>
+                        {indeks === 0
+                          ? "TOTAL"
+                          : kolom.total
+                            ? formatSel(totalLembar[kolom.kunci], kolom.tipe)
+                            : ""}
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         ) : (
@@ -305,6 +353,25 @@ export function DatasetPanel({ dataset }: Props) {
           </div>
         )}
       </div>
+
+      {definisiLembar && barisLembar.length > 0 && rumusLembar.length > 0 && (
+        <div className="card elev-sm">
+          <div className="card-kicker">Rumus perhitungan — {definisiLembar.nama}</div>
+          <p className={styles.petunjuk}>
+            Kolom bertanda ƒ tidak diisi manual. Berkas “Unduh hasil olahan” memuat rumus
+            yang sama sebagai rumus Excel yang hidup, jadi perhitungannya bisa ditelusuri
+            di bilah rumus.
+          </p>
+          <dl className={styles.rumusDaftar}>
+            {rumusLembar.map((kolom) => (
+              <div key={kolom.kunci} className={styles.rumusBaris}>
+                <dt>{kolom.judul}</dt>
+                <dd>{kolom.rumus?.teks}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
 
       {definisi && baris.length === 0 && !memuat && !galat && (
         <div className="card elev-sm">
@@ -326,8 +393,43 @@ export function DatasetPanel({ dataset }: Props) {
 function formatSel(nilai: unknown, tipe: string) {
   if (nilai === null || nilai === undefined || nilai === "") return "-";
   if (tipe === "ya-tidak") return nilai === true ? "ya" : "tidak";
-  if (tipe === "angka" && typeof nilai === "number") return nilai.toLocaleString("id-ID");
+  if (tipe === "persen" && typeof nilai === "number") {
+    return `${nilai > 0 ? "+" : ""}${(nilai * 100).toFixed(1)}%`;
+  }
+  if (tipe === "angka" && typeof nilai === "number") {
+    return nilai.toLocaleString("id-ID", { maximumFractionDigits: 4 });
+  }
   return String(nilai);
+}
+
+/**
+ * Baris TOTAL untuk tabel di layar, memakai aturan yang sama dengan sel TOTAL
+ * di berkas Excel: kolom `jumlah` dijumlahkan, kolom `rasio` dibagi dari dua
+ * total lain — bukan dirata-ratakan, karena rata-rata persentase per baris
+ * memberi angka yang berbeda dari selisih total terhadap pagu total.
+ */
+function hitungTotal(definisi: Lembar | undefined, baris: BarisTersimpan[]) {
+  if (!definisi || baris.length === 0) return null;
+  const berTotal = definisi.kolom.filter((kolom) => kolom.total);
+  if (berTotal.length === 0) return null;
+
+  const jumlahkan = (kunci: string) =>
+    baris.reduce((total, row) => {
+      const nilai = row.data[kunci];
+      return total + (typeof nilai === "number" && Number.isFinite(nilai) ? nilai : 0);
+    }, 0);
+
+  const hasil: Record<string, number | null> = {};
+  for (const kolom of berTotal) {
+    const total = kolom.total!;
+    if (total.jenis === "jumlah") {
+      hasil[kolom.kunci] = jumlahkan(kolom.kunci);
+    } else {
+      const bawah = jumlahkan(total.bawah);
+      hasil[kolom.kunci] = bawah === 0 ? null : jumlahkan(total.atas) / bawah;
+    }
+  }
+  return hasil;
 }
 
 /** Kegagalan token Blob tampil generik; /api/health tahu layanan mana yang bermasalah. */
